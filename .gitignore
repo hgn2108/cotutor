@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+node_modules/
+dist/
+backend/cotutor/data/cache/
+web/*.tsbuildinfo
+.claude/

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "two-sum", "title": "Two Sum", "difficulty": "easy", "tags": ["hash map"],
+    "statement": "Given a list of integers nums and an integer target, return the indices of the two different elements whose sum equals target. Assume exactly one such pair exists; the indices may be returned in any order.\n\nExample: nums = [2, 7, 11, 15], target = 9 -> [0, 1]\nExample: nums = [3, 2, 4], target = 6 -> [1, 2]"
+  },
+  {
+    "id": "valid-parentheses", "title": "Valid Parentheses", "difficulty": "easy", "tags": ["stack"],
+    "statement": "Given a string s made only of the characters ()[]{}, decide whether the brackets are balanced: every opening bracket is closed by the same type of bracket, and brackets close in the correct order.\n\nExample: s = \"()[]{}\" -> true\nExample: s = \"([)]\" -> false\nExample: s = \"{[]}\" -> true"
+  },
+  {
+    "id": "best-time-stock", "title": "Best Time to Buy and Sell Stock", "difficulty": "easy", "tags": ["array", "greedy"],
+    "statement": "prices[i] is a stock's price on day i. Choose one day to buy and a later day to sell to maximize profit. Return the maximum profit, or 0 if no profitable trade exists.\n\nExample: prices = [7, 1, 5, 3, 6, 4] -> 5\nExample: prices = [7, 6, 4, 3, 1] -> 0"
+  },
+  {
+    "id": "binary-search", "title": "Binary Search", "difficulty": "easy", "tags": ["binary search"],
+    "statement": "Given a sorted list of distinct integers nums and an integer target, return the index of target in nums, or -1 if it is not present. Your algorithm must run in O(log n) time.\n\nExample: nums = [-1, 0, 3, 5, 9, 12], target = 9 -> 4\nExample: nums = [-1, 0, 3, 5, 9, 12], target = 2 -> -1"
+  },
+  {
+    "id": "longest-substring", "title": "Longest Substring Without Repeating Characters", "difficulty": "medium", "tags": ["sliding window", "hash map"],
+    "statement": "Given a string s, return the length of the longest contiguous substring that contains no repeated characters.\n\nExample: s = \"abcabcbb\" -> 3 (\"abc\")\nExample: s = \"bbbbb\" -> 1\nExample: s = \"pwwkew\" -> 3 (\"wke\")"
+  },
+  {
+    "id": "container-water", "title": "Container With Most Water", "difficulty": "medium", "tags": ["two pointers"],
+    "statement": "height[i] is the height of a vertical line at x = i. Pick two lines that, together with the x-axis, form a container holding the most water. Return that maximum area (width times the shorter height).\n\nExample: height = [1, 8, 6, 2, 5, 4, 8, 3, 7] -> 49\nExample: height = [1, 1] -> 1"
+  },
+  {
+    "id": "three-sum", "title": "3Sum", "difficulty": "medium", "tags": ["two pointers", "sorting"],
+    "statement": "Given a list of integers nums, return every unique triplet [a, b, c] of values taken from three different positions such that a + b + c == 0. The answer must not contain duplicate triplets; order of triplets and of values inside a triplet does not matter.\n\nExample: nums = [-1, 0, 1, 2, -1, -4] -> [[-1, -1, 2], [-1, 0, 1]]\nExample: nums = [0, 1, 1] -> []"
+  },
+  {
+    "id": "coin-change", "title": "Coin Change", "difficulty": "medium", "tags": ["dynamic programming"],
+    "statement": "Given coin denominations coins (unlimited supply of each) and an integer amount, return the fewest coins needed to make exactly amount, or -1 if it cannot be made.\n\nExample: coins = [1, 2, 5], amount = 11 -> 3 (5 + 5 + 1)\nExample: coins = [2], amount = 3 -> -1\nExample: coins = [1], amount = 0 -> 0"
+  },
+  {
+    "id": "number-of-islands", "title": "Number of Islands", "difficulty": "medium", "tags": ["graph", "BFS/DFS", "grid"],
+    "statement": "Given a 2D grid of \"1\" (land) and \"0\" (water) strings, count the islands. An island is a group of land cells connected horizontally or vertically.\n\nExample: grid = [[\"1\",\"1\",\"0\",\"0\"],[\"1\",\"1\",\"0\",\"0\"],[\"0\",\"0\",\"1\",\"0\"],[\"0\",\"0\",\"0\",\"1\"]] -> 3"
+  },
+  {
+    "id": "reverse-linked-list", "title": "Reverse Linked List", "difficulty": "easy", "tags": ["linked list"],
+    "statement": "Given the head of a singly linked list, reverse the list and return the new head.\n\nExample: head = [1, 2, 3, 4, 5] -> [5, 4, 3, 2, 1]\nExample: head = [] -> []"
+  },
+  {
+    "id": "max-depth-tree", "title": "Maximum Depth of Binary Tree", "difficulty": "easy", "tags": ["tree", "DFS"],
+    "statement": "Given the root of a binary tree, return its maximum depth: the number of nodes on the longest path from the root down to a leaf. Trees are written in level order with null for missing children.\n\nExample: root = [3, 9, 20, null, null, 15, 7] -> 3\nExample: root = [1, null, 2] -> 2"
+  },
+  {
+    "id": "top-k-frequent", "title": "Top K Frequent Elements", "difficulty": "medium", "tags": ["heap", "bucket sort"],
+    "statement": "Given a list of integers nums and an integer k, return the k values that occur most often, in any order. The answer is guaranteed to be unique.\n\nExample: nums = [1, 1, 1, 2, 2, 3], k = 2 -> [1, 2]\nExample: nums = [4], k = 1 -> [4]"
+  }
+]
