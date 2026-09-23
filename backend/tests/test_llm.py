@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from google.genai import errors
 
@@ -20,6 +21,8 @@ class FakeGemini(GeminiClient):
     async def _call(self, model, prompt, config):
         self.calls.append(model)
         outcome = self.behavior[model].pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
         if isinstance(outcome, int):
             raise errors.APIError(outcome, {"error": {"message": "busy"}})
         return SimpleNamespace(parsed=outcome, text="", usage_metadata=None)
@@ -61,3 +64,9 @@ async def test_gives_up_when_every_model_stays_down():
     llm = FakeGemini({"fast-a": [503, 429]})
     with pytest.raises(LLMError, match="overloaded"):
         await llm.structured(agent="t", system="", prompt="", schema=Param, tier="fast")
+
+
+async def test_dropped_connection_fails_over():
+    llm = FakeGemini({"smart-a": [httpx.RemoteProtocolError("disconnected")], "smart-b": [OK]})
+    value, usage = await llm.structured(agent="t", system="", prompt="", schema=Param)
+    assert usage.model == "smart-b"

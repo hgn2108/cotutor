@@ -6,9 +6,11 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from cotutor import api
+from cotutor.cache import RunCache
 from cotutor.executor import LocalExecutor
 from cotutor.llm import ScriptedLLM
+from cotutor.server import app as server_app
+from cotutor.server import deps
 
 from .fixtures import two_sum_script
 
@@ -17,9 +19,9 @@ PROBLEM = "Given nums and target, return indices of two numbers adding up to tar
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(api, "cache", api.RunCache(tmp_path))
-    monkeypatch.setattr(api, "make_llm", lambda key: ScriptedLLM(two_sum_script()))
-    return TestClient(api.app)
+    monkeypatch.setattr(deps, "cache", RunCache(tmp_path))
+    monkeypatch.setattr(deps, "make_llm", lambda key: ScriptedLLM(two_sum_script()))
+    return TestClient(server_app.app)
 
 
 def drive_session(ws, message):

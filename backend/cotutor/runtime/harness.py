@@ -152,7 +152,9 @@ def convert_args(args, params):
     out = []
     for i, value in enumerate(args):
         kind = _kind(params[i].get("type") if i < len(params) else "")
-        if kind == "listnode":
+        if isinstance(value, (ListNode, TreeNode)) or value is None:
+            out.append(value)  # generators sometimes build nodes themselves
+        elif kind == "listnode":
             out.append(build_list(value))
         elif kind == "list_of_lists_nodes":
             out.append([build_list(v) for v in value])
@@ -226,7 +228,7 @@ def judge(checker, args, got, expected, comparison):
     return outputs_match(got, expected, comparison)
 
 
-def call(fn, args, params, in_place_arg):
+def call(fn, args, params, in_place_arg, return_type=""):
     """Run fn on a deep copy of args; returns (plain_output, stdout)."""
     real_args = convert_args(copy.deepcopy(args), params)
     buf = io.StringIO()
@@ -234,6 +236,8 @@ def call(fn, args, params, in_place_arg):
         result = fn(*real_args)
     if in_place_arg is not None and in_place_arg >= 0:
         result = real_args[in_place_arg]
+    if result is None and _kind(return_type) in ("listnode", "treenode"):
+        result = []  # an empty list/tree is None at runtime and [] in LeetCode's JSON
     return to_plain(result), buf.getvalue()[:MAX_STDOUT]
 
 
@@ -250,6 +254,7 @@ def format_error(exc):
 def job_tests(job, emit):
     spec = job["spec"]
     params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
+    ret = spec.get("return_type", "")
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
     checker = load_checker(job)
     ref = None
@@ -268,14 +273,14 @@ def job_tests(job, emit):
             expected_source = "none"
             if ref is not None:
                 try:
-                    expected, _ = call(ref, case["args"], params, in_place)
+                    expected, _ = call(ref, case["args"], params, in_place, ret)
                     expected_source = "reference"
                 except Exception as exc:
                     emit({"ev": "reference_error", "id": case["id"], "error": format_error(exc)})
         start = time.perf_counter()
         res = {"id": case["id"], "expected": expected, "expected_source": expected_source}
         try:
-            got, out = call(fn, case["args"], params, in_place)
+            got, out = call(fn, case["args"], params, in_place, ret)
             res.update(got=got, stdout=out)
             if expected_source == "none" and checker is None:
                 res["status"] = "ran"
@@ -293,6 +298,7 @@ def job_tests(job, emit):
 def job_differential(job, emit):
     spec = job["spec"]
     params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
+    ret = spec.get("return_type", "")
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
     ref = resolve_callable(load_namespace(job["reference_code"], "<reference>"), spec["entry"])
     checker = load_checker(job)
@@ -307,14 +313,14 @@ def job_differential(job, emit):
             break
         args = generate(rng, sizes[i % len(sizes)])
         try:
-            expected, _ = call(ref, args, params, in_place)
+            expected, _ = call(ref, args, params, in_place, ret)
         except Exception:
             ref_errors += 1
             continue
         trials += 1
         emit({"ev": "trial", "n": trials})
         try:
-            got, _ = call(fn, args, params, in_place)
+            got, _ = call(fn, args, params, in_place, ret)
         except Exception as exc:
             return {"trials": trials, "reference_errors": ref_errors,
                     "counterexample": {"args": args, "expected": expected, "error": format_error(exc)}}
@@ -322,6 +328,13 @@ def job_differential(job, emit):
             return {"trials": trials, "reference_errors": ref_errors,
                     "counterexample": {"args": args, "expected": expected, "got": got}}
     return {"trials": trials, "reference_errors": ref_errors, "counterexample": None}
+
+
+def _pick_generator(gen_ns, job):
+    """``which="random"`` forces generate(); otherwise prefer generate_worst when defined."""
+    if job.get("which") == "random":
+        return gen_ns["generate"]
+    return gen_ns.get("generate_worst") or gen_ns["generate"]
 
 
 def fit_slope(points):
@@ -346,30 +359,52 @@ def job_complexity(job, emit):
     params = spec["params"]
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
     gen_ns = load_namespace(job["generator_code"], "<generator>")
-    generate = gen_ns.get("generate_worst") or gen_ns["generate"]
-    rng = random.Random(job.get("seed", 1))
+    generate = _pick_generator(gen_ns, job)
     target_ms, max_n = job.get("target_ms", 60.0), job.get("max_n", 1 << 20)
     budget = job.get("budget_s", 6.0)
+    seed = job.get("seed", 1)
     started, points, n = time.perf_counter(), [], job.get("start_n", 64)
+    stopped, last_size = None, -1
     while n <= max_n:
-        args = convert_args(generate(rng, n), params)
+        size = _input_size(generate(random.Random(seed + n), n))
+        if size is not None and size <= last_size:
+            # A generator that caps its output would make growth look flat; stop measuring.
+            stopped = f"generator stopped growing at n={n // 2} (input size {last_size})"
+            break
+        last_size = size if size is not None else last_size
         best = None
-        for _ in range(job.get("repeats", 3)):
-            a = copy.deepcopy(args)
-            t0 = time.perf_counter()
-            with redirect_stdout(io.StringIO()):
-                fn(*a)
-            elapsed = (time.perf_counter() - t0) * 1000
-            best = elapsed if best is None else min(best, elapsed)
-            if best > target_ms:
-                break
+        try:
+            for _ in range(job.get("repeats", 3)):
+                # Regenerate instead of deep-copying: copying a long ListNode chain recurses.
+                a = convert_args(generate(random.Random(seed + n), n), params)
+                t0 = time.perf_counter()
+                with redirect_stdout(io.StringIO()):
+                    fn(*a)
+                elapsed = (time.perf_counter() - t0) * 1000
+                best = elapsed if best is None else min(best, elapsed)
+                if best > target_ms:
+                    break
+        except (RecursionError, MemoryError) as exc:
+            stopped = f"stopped at n={n}: {type(exc).__name__}"  # keep the points we have
+            break
         points.append([n, round(best, 4)])
         emit({"ev": "point", "n": n, "ms": best})
         if best >= target_ms or time.perf_counter() - started > budget:
             break
         n *= 2
-    return {"points": points, "slope": fit_slope(points),
-            "used_worst_case": "generate_worst" in gen_ns}
+    return {"points": points, "slope": fit_slope(points), "stopped": stopped,
+            "used_worst_case": generate is gen_ns.get("generate_worst")}
+
+
+def _input_size(args):
+    """Total length of the list/str/node-chain arguments, or None if there are none."""
+    total, found = 0, False
+    for a in args:
+        if isinstance(a, (list, str, tuple)):
+            total, found = total + len(a), True
+        elif isinstance(a, ListNode):
+            total, found = total + len(list_to_values(a)), True
+    return total if found else None
 
 
 def snapshot(value, depth=0):
@@ -460,21 +495,30 @@ def job_line_counts(job, emit):
     params = spec["params"]
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
     gen_ns = load_namespace(job["generator_code"], "<generator>")
-    generate = gen_ns.get("generate_worst") or gen_ns["generate"]
+    generate = _pick_generator(gen_ns, job)
     cap = job.get("max_events", 200_000)
     deadline = time.perf_counter() + job.get("budget_s", 4.0)
     runs = []
     for n in job.get("sizes") or [4, 8, 16, 32]:
         if time.perf_counter() > deadline:
             break
-        args = convert_args(generate(random.Random(job.get("seed", 7)), n), params)
-        counts, total, capped = _count_lines(fn, args, cap)
+        # Random inputs are averaged over several seeds; one sample is too noisy at small n.
+        trials = max(1, job.get("trials", 1))
+        counts, total, capped = {}, 0, False
+        for t in range(trials):
+            args = convert_args(generate(random.Random(job.get("seed", 7) + t), n), params)
+            c, tot, cap_hit = _count_lines(fn, args, cap)
+            for line, v in c.items():
+                counts[line] = counts.get(line, 0) + v
+            total, capped = total + tot, capped or cap_hit
+        counts = {k: round(v / trials) for k, v in counts.items()}
+        total = round(total / trials)
         runs.append({"n": n, "total": total, "capped": capped,
                      "counts": {str(k): v for k, v in sorted(counts.items())}})
         emit({"ev": "point", "n": n, "total": total})
         if capped:
             break
-    return {"runs": runs, "used_worst_case": "generate_worst" in gen_ns}
+    return {"runs": runs, "used_worst_case": generate is gen_ns.get("generate_worst")}
 
 
 class _StepCap(Exception):

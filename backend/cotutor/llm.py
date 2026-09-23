@@ -13,6 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypeVar
 
+import httpx
 from pydantic import BaseModel
 
 Tier = Literal["smart", "fast"]
@@ -98,6 +99,11 @@ class GeminiClient:
                     continue
                 except ValueError:  # malformed structured output; another try usually fixes it
                     last_error = f"{model} returned invalid JSON"
+                    continue
+                except (httpx.TransportError, TimeoutError, ConnectionError) as exc:
+                    # Dropped connections and timeouts behave like a momentary overload.
+                    self._cooling_until[model] = time.monotonic() + self.COOLDOWN_S / 4
+                    last_error = f"{model}: {type(exc).__name__}"
                     continue
                 self._cooling_until.pop(model, None)
                 meta = resp.usage_metadata

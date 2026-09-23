@@ -18,9 +18,9 @@ from .pipeline import Emit
 DEMO_DIR = Path(__file__).parent / "data" / "demos"
 
 
-def cache_key(problem: str, solver: str) -> str:
+def cache_key(problem: str) -> str:
     norm = re.sub(r"\s+", " ", problem.strip().lower())
-    return hashlib.sha256(f"{solver}\n{norm}".encode()).hexdigest()[:24]
+    return hashlib.sha256(norm.encode()).hexdigest()[:24]
 
 
 class RunCache:
@@ -30,22 +30,22 @@ class RunCache:
         self._demos: dict[str, Path] = {}
         for path in sorted(DEMO_DIR.glob("*.json")):
             rec = json.loads(path.read_text())
-            self._demos[cache_key(rec["problem"], rec["solver"])] = path
+            self._demos[cache_key(rec["problem"])] = path
 
-    def get(self, problem: str, solver: str) -> dict[str, Any] | None:
-        key = cache_key(problem, solver)
+    def get(self, problem: str) -> dict[str, Any] | None:
+        key = cache_key(problem)
         for path in (self.dir / f"{key}.json", self._demos.get(key)):
             if path and path.exists():
                 return json.loads(path.read_text())
         return None
 
-    def put(self, problem: str, solver: str, events: list[dict[str, Any]], meta: dict | None = None):
+    def put(self, problem: str, events: list[dict[str, Any]], meta: dict | None = None) -> None:
         if not events or events[-1].get("type") != "done":
             return
         if not events[-1]["summary"].get("verified"):
             return  # only cache runs worth showing again
-        record = {"problem": problem, "solver": solver, "events": events, **(meta or {})}
-        (self.dir / f"{cache_key(problem, solver)}.json").write_text(json.dumps(record))
+        record = {"problem": problem, "events": events, **(meta or {})}
+        (self.dir / f"{cache_key(problem)}.json").write_text(json.dumps(record))
 
 
 async def replay(record: dict[str, Any], emit: Emit, total_s: float = 4.0) -> None:

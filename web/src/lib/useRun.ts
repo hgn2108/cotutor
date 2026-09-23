@@ -92,7 +92,7 @@ function applyMessage(state: RunState, msg: ServerMessage): RunState {
   }
 }
 
-export interface SolveOptions { solver: 'gemini' | 'llama'; apiKey?: string; fresh?: boolean }
+export interface SolveOptions { apiKey?: string; fresh?: boolean }
 
 export function useRun() {
   const [state, dispatch] = useReducer(reducer, initial)
@@ -163,7 +163,7 @@ export function useRun() {
     dispatch({ type: 'start', problem })
     try {
       const ws = await connect()
-      ws.send(JSON.stringify({ type: 'solve', problem, solver: opts.solver, api_key: opts.apiKey, fresh: opts.fresh }))
+      ws.send(JSON.stringify({ type: 'solve', problem, api_key: opts.apiKey, fresh: opts.fresh }))
     } catch (err) {
       dispatch({ type: 'fail', message: String((err as Error).message ?? err) })
     }

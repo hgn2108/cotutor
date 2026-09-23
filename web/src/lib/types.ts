@@ -175,7 +175,6 @@ export type ServerMessage =
 
 export interface Features {
   server_key: boolean
-  llama: boolean
   models: { smart: string; fast: string }
 }
 

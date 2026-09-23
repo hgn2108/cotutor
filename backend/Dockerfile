@@ -17,4 +17,4 @@ ENV PATH="/app/.venv/bin:$PATH" \
     COTUTOR_CACHE_DIR=/tmp/cotutor-cache \
     PYTHONUNBUFFERED=1
 EXPOSE 7860
-CMD ["uvicorn", "cotutor.api:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "cotutor.server.app:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]

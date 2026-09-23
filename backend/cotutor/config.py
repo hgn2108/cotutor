@@ -24,9 +24,6 @@ class Settings:
         "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite"))
     fast_models: list[str] = field(default_factory=lambda: _csv(
         "COTUTOR_FAST_MODELS", "gemini-3.5-flash-lite,gemini-3.1-flash-lite"))
-    # Optional: HTTPS endpoint serving the fine-tuned Llama (see modal/serve_llama.py).
-    llama_url: str | None = os.getenv("COTUTOR_LLAMA_URL")
-    llama_token: str | None = os.getenv("COTUTOR_LLAMA_TOKEN")
 
     max_debug_attempts: int = int(os.getenv("COTUTOR_MAX_DEBUG_ATTEMPTS", "3"))
     exec_timeout_s: float = float(os.getenv("COTUTOR_EXEC_TIMEOUT_S", "8"))

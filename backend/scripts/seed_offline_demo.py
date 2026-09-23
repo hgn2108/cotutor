@@ -7,7 +7,7 @@ Run from backend/:  uv run python -m scripts.seed_offline_demo
 import asyncio
 import json
 
-from cotutor.api import PROBLEMS
+from cotutor import library
 from cotutor.cache import DEMO_DIR
 from cotutor.executor import LocalExecutor
 from cotutor.llm import ScriptedLLM
@@ -21,9 +21,9 @@ async def main() -> None:
     async def emit(ev: dict) -> None:
         events.append(ev)
 
-    problem = next(p for p in PROBLEMS if p["id"] == "two-sum")
+    problem = next(p for p in library.problems() if p["id"] == "two-sum")
     summary = await Pipeline(ScriptedLLM(two_sum_script()), LocalExecutor(), emit).run(problem["statement"])
-    out = {"problem": problem["statement"], "solver": "gemini", "recording": "scripted", "events": events}
+    out = {"problem": problem["statement"], "recording": "scripted", "events": events}
     (DEMO_DIR / "two-sum.json").write_text(json.dumps(out))
     print(summary)
 

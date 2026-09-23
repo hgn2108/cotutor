@@ -10,7 +10,7 @@ import argparse
 import asyncio
 import json
 
-from .api import PROBLEMS
+from . import library
 from .cache import DEMO_DIR
 from .config import settings
 from .executor import LocalExecutor
@@ -33,7 +33,7 @@ async def record(problem: dict, llm) -> bool:
         why = summary.get("error") or ("lesson incomplete" if summary.get("verified") else "not verified")
         print(f"  not saved ({why})")
         return False
-    out = {"problem": problem["statement"], "solver": "gemini", "recording": "live",
+    out = {"problem": problem["statement"], "recording": "live",
            "models": settings.smart_models + settings.fast_models, "events": events}
     (DEMO_DIR / f"{problem['id']}.json").write_text(json.dumps(out))
     return True
@@ -47,7 +47,7 @@ async def main() -> None:
         raise SystemExit("Set GEMINI_API_KEY in .env first.")
     llm = GeminiClient(settings.gemini_api_key, settings.smart_models, settings.fast_models)
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
-    chosen = [p for p in PROBLEMS if not args.ids or p["id"] in args.ids]
+    chosen = [p for p in library.problems() if not args.ids or p["id"] in args.ids]
     ok = 0
     for p in chosen:
         print(f"• {p['title']}")
