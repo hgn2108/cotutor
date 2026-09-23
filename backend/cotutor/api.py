@@ -57,7 +57,7 @@ def make_llm(user_key: str | None) -> LLMClient | None:
     key = user_key or settings.gemini_api_key
     if not key:
         return None
-    return GeminiClient(key, settings.smart_model, settings.fast_model)
+    return GeminiClient(key, settings.smart_models, settings.fast_models)
 
 
 def make_solver(name: str):
@@ -75,7 +75,7 @@ def health() -> dict[str, Any]:
 
 def features() -> dict[str, Any]:
     return {"server_key": bool(settings.gemini_api_key), "llama": bool(settings.llama_url),
-            "models": {"smart": settings.smart_model, "fast": settings.fast_model}}
+            "models": {"smart": settings.smart_models[0], "fast": settings.fast_models[0]}}
 
 
 @app.get("/api/problems")

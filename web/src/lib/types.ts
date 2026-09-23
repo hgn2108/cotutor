@@ -192,6 +192,7 @@ export interface LessonIntro {
   bottleneck: string
   bottleneck_hints: string[]
   brute_force_code: string
+  brute_is_optimal?: boolean
 }
 
 export interface LessonDeep {

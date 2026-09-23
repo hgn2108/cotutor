@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -72,9 +73,12 @@ class Stage:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        status = "failed" if exc else (self.status or "done")
-        if exc and not self.detail:
-            self.detail = str(exc)[:300]
+        if isinstance(exc, asyncio.CancelledError):
+            status, self.detail = "skipped", self.detail or "Stopped because another step failed."
+        else:
+            status = "failed" if exc else (self.status or "done")
+            if exc and not self.detail:
+                self.detail = str(exc)[:300]
         await self.run.emit({
             "type": "stage", "id": self.id, "label": self.label, "status": status,
             "detail": self.detail, "ms": round((time.perf_counter() - self._t0) * 1000),
@@ -150,9 +154,12 @@ class Pipeline:
         plan, solution = await asyncio.gather(self._design_tests(spec), self._solve(spec))
         await self.artifact("solution", solution.model_dump() | {"revision": 0})
 
+        plan, brute_is_optimal = await self._ensure_naive_reference(spec, plan, solution)
+
         # The first half of the lesson only needs the spec, the brute force and the approach,
         # so the Coach teaches while verification is still running.
-        intro_task = asyncio.create_task(self._coach_intro(problem, spec, solution, plan))
+        intro_task = asyncio.create_task(
+            self._coach_intro(problem, spec, solution, plan, brute_is_optimal))
         explain_task: asyncio.Task | None = None
         try:
             cases, oracle = await self._validate_oracle(spec, plan)
@@ -344,11 +351,58 @@ class Pipeline:
         await self.artifact("complexity", data)
         return data
 
-    async def _coach_intro(self, problem, spec, solution, plan) -> dict[str, Any] | None:
+    async def _step_growth(self, spec, code: str, generator: str) -> float | None:
+        """Growth exponent from exact step counts: log2(steps(2n) / steps(n)) at the largest n."""
+        res = await self.execute({"kind": "line_counts", "spec": _harness_spec(spec), "code": code,
+                                  "generator_code": generator, "sizes": [8, 16, 32, 64]})
+        runs = [r for r in res.get("runs", []) if not r["capped"]] if res.get("ok") else []
+        if len(runs) < 2 or runs[-2]["total"] <= 0:
+            return None
+        return math.log2(runs[-1]["total"] / runs[-2]["total"])
+
+    async def _ensure_naive_reference(self, spec, plan: TestPlan, solution: Solution):
+        """The brute force doubles as the lesson's starting point, so it must actually be naive.
+
+        Step counts on doubling inputs tell us. If the reference grows no faster than the
+        solution, the Test Designer gets one retry with that feedback. If it still doesn't,
+        the problem simply has no slower obvious approach and the lesson says so.
+        """
+        if not plan.generator_code.strip():
+            return plan, False
+        async with self.stage("naive_check", "Check the brute force is really brute force") as st:
+            sol = await self._step_growth(spec, solution.code, plan.generator_code)
+            ref = await self._step_growth(spec, plan.reference_solution, plan.generator_code)
+            if sol is None or ref is None or ref >= sol + 0.5:
+                st.note("Brute force grows faster than the solution, as a starting point should."
+                        if sol is not None and ref is not None else "Could not measure; skipped.")
+                return plan, False
+            st.note(f"Reference grows like n^{ref:.1f}, same as the solution. Asking for a naive one.",
+                    "warning")
+            feedback = (
+                f"Your reference solution is not naive: measured step counts grow like n^{ref:.1f}, "
+                f"the same as the optimized solution ({solution.approach}). Write a brute force that "
+                "enumerates candidates directly, without that technique. Keep the same generator "
+                "and checker behaviour."
+            )
+            try:
+                retry, u = await agents.design_tests(self.llm, spec, feedback)
+                st.usage(u)
+            except LLMError:
+                return plan, True
+            ref2 = await self._step_growth(spec, retry.reference_solution, retry.generator_code
+                                           or plan.generator_code)
+            if ref2 is not None and ref2 >= sol + 0.5:
+                st.note(f"Rewrote the brute force: it now grows like n^{ref2:.1f} vs n^{sol:.1f}.")
+                await self.artifact("test_plan", retry.model_dump())
+                return retry, False
+            st.note("No slower straightforward approach exists; the direct approach is already optimal.")
+            return plan, True
+
+    async def _coach_intro(self, problem, spec, solution, plan, brute_is_optimal=False):
         try:
             async with self.stage("coach_intro", "Coach: pattern, brute force and its bottleneck") as st:
                 intro, u = await agents.coach_intro(self.llm, problem, spec, solution,
-                                                    plan.reference_solution)
+                                                    plan.reference_solution, brute_is_optimal)
                 st.usage(u)
                 st.note(f"Pattern: {intro.pattern} · {len(intro.bottleneck_hints)} hints")
         except LLMError:
@@ -365,6 +419,9 @@ class Pipeline:
                 data["pattern_options"].append({"name": intro.pattern, "correct": True,
                                                 "feedback": intro.pattern_summary})
         data["brute_force_code"] = plan.reference_solution
+        data["brute_is_optimal"] = brute_is_optimal
+        if brute_is_optimal:
+            data["bottleneck_line"] = None
         await self.artifact("lesson_intro", data)
         return data
 

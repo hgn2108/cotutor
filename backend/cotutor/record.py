@@ -29,11 +29,12 @@ async def record(problem: dict, llm) -> bool:
     summary = await Pipeline(llm, LocalExecutor(), emit,
                              PipelineConfig(max_debug_attempts=settings.max_debug_attempts)
                              ).run(problem["statement"])
-    if not summary.get("verified"):
-        print(f"  not verified; not saved ({summary.get('error', '')})")
+    if not summary.get("verified") or not summary.get("lesson"):
+        why = summary.get("error") or ("lesson incomplete" if summary.get("verified") else "not verified")
+        print(f"  not saved ({why})")
         return False
     out = {"problem": problem["statement"], "solver": "gemini", "recording": "live",
-           "models": [settings.smart_model, settings.fast_model], "events": events}
+           "models": settings.smart_models + settings.fast_models, "events": events}
     (DEMO_DIR / f"{problem['id']}.json").write_text(json.dumps(out))
     return True
 
@@ -44,7 +45,7 @@ async def main() -> None:
     args = parser.parse_args()
     if not settings.gemini_api_key:
         raise SystemExit("Set GEMINI_API_KEY in .env first.")
-    llm = GeminiClient(settings.gemini_api_key, settings.smart_model, settings.fast_model)
+    llm = GeminiClient(settings.gemini_api_key, settings.smart_models, settings.fast_models)
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     chosen = [p for p in PROBLEMS if not args.ids or p["id"] in args.ids]
     ok = 0

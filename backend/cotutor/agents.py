@@ -47,15 +47,21 @@ async def analyze(llm: LLMClient, problem: str) -> tuple[ProblemSpec, Usage]:
     )
 
 
-async def design_tests(llm: LLMClient, spec: ProblemSpec) -> tuple[TestPlan, Usage]:
+async def design_tests(
+    llm: LLMClient, spec: ProblemSpec, feedback: str | None = None
+) -> tuple[TestPlan, Usage]:
     system = (
         "You are the Test Designer. Your job is to catch wrong solutions. Produce:\n"
         "1. Inputs only (no expected outputs) for edge cases and tricky cases: empty/minimal "
         "inputs, duplicates, negatives, boundaries from the constraints, off-by-one traps. "
         "Keep each input small (under 30 elements) except at most one 'large' case.\n"
-        "2. A brute-force reference solution that is obviously correct. Clarity over speed; "
-        "expected outputs are computed by running it. Students also study it as the starting "
-        "point, so use clear names and the simplest possible structure.\n"
+        "2. A NAIVE brute-force reference solution that is obviously correct: enumerate every "
+        "candidate (all pairs, all substrings, all subsets, every start index...) and check "
+        "each one directly. Do NOT use the clever technique the problem is known for (no "
+        "sliding window, two pointers, hash-map shortcuts, memoization or greedy tricks) "
+        "unless no simpler correct approach exists. Expected outputs are computed by running "
+        "it, and students study it as the starting point before learning the optimization, "
+        "so use clear names and the simplest possible structure.\n"
         "3. generate(rng, n) returning a list of args for a random valid input of size n "
         "(use only rng = random.Random), and generate_worst(rng, n) producing the input that "
         "maximizes running time for a typical efficient solution, so timing reveals growth. "
@@ -64,8 +70,11 @@ async def design_tests(llm: LLMClient, spec: ProblemSpec) -> tuple[TestPlan, Usa
         "that validates `got` directly against the problem rules (do not just compare to "
         "`expected`). Otherwise return an empty string.\n" + PYTHON_ENV_NOTE
     )
+    prompt = _spec_block(spec)
+    if feedback:
+        prompt += f"\n\nFeedback on your previous attempt:\n{feedback}"
     return await llm.structured(
-        agent="test_designer", system=system, prompt=_spec_block(spec),
+        agent="test_designer", system=system, prompt=prompt,
         schema=TestPlan, tier="smart", temperature=0.3,
     )
 
@@ -141,7 +150,8 @@ COACH_STYLE = (
 
 
 async def coach_intro(
-    llm: LLMClient, problem: str, spec: ProblemSpec, solution: Solution, brute_force: str
+    llm: LLMClient, problem: str, spec: ProblemSpec, solution: Solution, brute_force: str,
+    brute_is_optimal: bool = False,
 ) -> tuple[LessonIntro, Usage]:
     system = COACH_STYLE + (
         " Build the first half of the lesson: which pattern applies and what in the wording "
@@ -155,6 +165,13 @@ async def coach_intro(
         f"Optimal approach (for your reference, do not reveal in hints): {solution.approach}. "
         f"{solution.key_insight}\n\nBrute-force code (line-numbered):\n{numbered(brute_force)}"
     )
+    if brute_is_optimal:
+        prompt += (
+            "\n\nMeasured: the straightforward approach above already grows as slowly as the "
+            "optimal one, so there is no wasted work to remove. Say so honestly: set "
+            "bottleneck_line to 0, use `bottleneck` to explain why the direct approach is "
+            "already optimal, and make the hints about why no faster approach is possible."
+        )
     return await llm.structured(
         agent="coach_intro", system=system, prompt=prompt, schema=LessonIntro,
         tier="smart", temperature=0.3,

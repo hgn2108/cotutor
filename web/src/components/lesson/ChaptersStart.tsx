@@ -140,6 +140,11 @@ export function BruteChapter() {
           <Badge tone="warn" className="font-mono text-[12px]">{intro.brute_force_time}</Badge>
           <span className="text-muted">{intro.brute_force_why}</span>
         </div>
+        {intro.brute_is_optimal && (
+          <Callout tone="ok" className="mt-3" icon={<Check className="size-4" />}>
+            Measured: for this problem the direct approach already grows as slowly as it can. Sometimes the obvious solution is the optimal one, and the skill is recognizing that.
+          </Callout>
+        )}
         {state.oracle && !state.oracle.trusted && (
           <p className="mt-2 text-xs text-warn">Heads up: this brute force disagreed with one of the examples during verification, so treat it as a sketch.</p>
         )}
@@ -207,6 +212,7 @@ export function BottleneckChapter() {
   return (
     <div>
       {!open && <Prose className="mb-3 font-medium">Click the line that does the most repeated, wasted work as the input grows.</Prose>}
+      {intro.brute_is_optimal && <Prose className="mb-3 font-medium">There's no wasted work to find here. Here's why the direct approach can't be beaten.</Prose>}
       <CodeView
         code={intro.brute_force_code} maxHeight={360} marks={marks}
         onLineClick={open ? undefined : click}

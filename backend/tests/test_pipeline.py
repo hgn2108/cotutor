@@ -96,3 +96,38 @@ async def test_bad_line_numbers_are_dropped():
     script["coach_intro"][0] = script["coach_intro"][0].model_copy(update={"bottleneck_line": 99})
     _, events, _ = await run_pipeline(script)
     assert artifacts(events, "lesson_intro")[0]["bottleneck_line"] is None
+
+
+async def test_secretly_optimal_brute_force_is_rewritten():
+    script = two_sum_script()
+    optimal_ref = script["test_designer"][0].model_copy(update={"reference_solution": (
+        "def twoSum(nums, target):\n"
+        "    seen = {}\n"
+        "    for i, x in enumerate(nums):\n"
+        "        if target - x in seen:\n"
+        "            return [seen[target - x], i]\n"
+        "        seen[x] = i\n")})
+    script["test_designer"] = [optimal_ref, script["test_designer"][0]]  # retry returns the naive one
+    summary, events, llm = await run_pipeline(script)
+
+    assert len(llm.calls["test_designer"]) == 2
+    assert "not naive" in llm.calls["test_designer"][1]
+    intro = artifacts(events, "lesson_intro")[0]
+    assert intro["brute_is_optimal"] is False and "for j in range" in intro["brute_force_code"]
+    assert summary["verified"] is True
+
+
+async def test_problem_without_slower_approach_is_flagged():
+    script = two_sum_script()
+    optimal_ref = script["test_designer"][0].model_copy(update={"reference_solution": (
+        "def twoSum(nums, target):\n"
+        "    seen = {}\n"
+        "    for i, x in enumerate(nums):\n"
+        "        if target - x in seen:\n"
+        "            return [seen[target - x], i]\n"
+        "        seen[x] = i\n")})
+    script["test_designer"] = [optimal_ref, optimal_ref]
+    _, events, llm = await run_pipeline(script)
+    intro = artifacts(events, "lesson_intro")[0]
+    assert intro["brute_is_optimal"] is True and intro["bottleneck_line"] is None
+    assert "already grows as slowly" in llm.calls["coach_intro"][0]

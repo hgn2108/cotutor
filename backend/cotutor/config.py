@@ -17,9 +17,13 @@ def _csv(name: str, default: str) -> list[str]:
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
-    # "smart" model does the reasoning-heavy work; "fast" handles cheap structuring steps.
-    smart_model: str = os.getenv("COTUTOR_SMART_MODEL", "gemini-3.8-flash")
-    fast_model: str = os.getenv("COTUTOR_FAST_MODEL", "gemini-3.5-flash-lite")
+    # "smart" models do the reasoning-heavy work; "fast" ones handle cheap structuring steps.
+    # Each is a fallback chain: later models are used when earlier ones are overloaded.
+    smart_models: list[str] = field(default_factory=lambda: _csv(
+        "COTUTOR_SMART_MODELS",
+        "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite"))
+    fast_models: list[str] = field(default_factory=lambda: _csv(
+        "COTUTOR_FAST_MODELS", "gemini-3.5-flash-lite,gemini-3.1-flash-lite"))
     # Optional: HTTPS endpoint serving the fine-tuned Llama (see modal/serve_llama.py).
     llama_url: str | None = os.getenv("COTUTOR_LLAMA_URL")
     llama_token: str | None = os.getenv("COTUTOR_LLAMA_TOKEN")

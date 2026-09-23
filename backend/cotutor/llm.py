@@ -39,50 +39,76 @@ class LLMClient(Protocol):
 
 
 class GeminiClient:
-    RETRYABLE = {429, 500, 502, 503, 504}
+    """Structured-output Gemini client with a health-aware model router.
 
-    def __init__(self, api_key: str, smart_model: str, fast_model: str, max_attempts: int = 4):
+    Free-tier capacity flips per model from minute to minute (503 "high demand"). Each tier
+    has a fallback chain; a model that just failed is put on a short cooldown shared by every
+    session in the process, healthy models are tried first, and the chain is retried for a
+    few rounds with backoff. Falling back to a weaker model is safe here because every agent
+    output is verified by execution before anyone sees it. ``Usage.model`` reports the model
+    that actually answered.
+    """
+
+    RETRYABLE = {429, 500, 502, 503, 504}
+    COOLDOWN_S = 60.0
+    _cooling_until: dict[str, float] = {}  # shared across instances on purpose
+
+    def __init__(self, api_key: str, smart_models: list[str], fast_models: list[str],
+                 rounds: int = 3, base_delay_s: float = 3.0):
         from google import genai  # imported lazily so tests don't need credentials
 
         self._client = genai.Client(api_key=api_key)
-        self._models = {"smart": smart_model, "fast": fast_model}
-        self._max_attempts = max_attempts
+        self._models = {"smart": smart_models, "fast": fast_models}
+        self._rounds = rounds
+        self._delay = base_delay_s
+
+    async def _call(self, model: str, prompt: str, config):
+        return await self._client.aio.models.generate_content(model=model, contents=prompt, config=config)
+
+    def _ordered(self, chain: list[str]) -> list[str]:
+        now = time.monotonic()
+        healthy = [m for m in chain if self._cooling_until.get(m, 0) <= now]
+        return healthy + [m for m in chain if m not in healthy]
 
     async def structured(self, *, agent, system, prompt, schema, tier="smart", temperature=0.2):
         from google.genai import errors, types
 
-        model = self._models[tier]
         config = types.GenerateContentConfig(
             system_instruction=system,
             response_mime_type="application/json",
             response_schema=schema,
             temperature=temperature,
         )
-        for attempt in range(1, self._max_attempts + 1):
-            start = time.perf_counter()
-            try:
-                resp = await self._client.aio.models.generate_content(
-                    model=model, contents=prompt, config=config
-                )
-                parsed = resp.parsed if isinstance(resp.parsed, schema) else None
-                if parsed is None:
-                    parsed = schema.model_validate_json(resp.text or "")
+        last_error = "no models configured"
+        for round_no in range(self._rounds):
+            if round_no:
+                await asyncio.sleep(self._delay * round_no + random.random() * self._delay)
+            for model in self._ordered(self._models[tier]):
+                start = time.perf_counter()
+                try:
+                    resp = await self._call(model, prompt, config)
+                    parsed = resp.parsed if isinstance(resp.parsed, schema) else None
+                    if parsed is None:
+                        parsed = schema.model_validate_json(resp.text or "")
+                except errors.APIError as exc:
+                    if exc.code not in self.RETRYABLE:
+                        raise LLMError(f"{agent}: Gemini error {exc.code}: {exc.message}") from exc
+                    self._cooling_until[model] = time.monotonic() + self.COOLDOWN_S
+                    last_error = f"{model} returned {exc.code}"
+                    continue
+                except ValueError:  # malformed structured output; another try usually fixes it
+                    last_error = f"{model} returned invalid JSON"
+                    continue
+                self._cooling_until.pop(model, None)
                 meta = resp.usage_metadata
-                usage = Usage(
+                return parsed, Usage(
                     model=model,
                     input_tokens=(meta.prompt_token_count or 0) if meta else 0,
                     output_tokens=(meta.candidates_token_count or 0) if meta else 0,
                     ms=(time.perf_counter() - start) * 1000,
                 )
-                return parsed, usage
-            except errors.APIError as exc:
-                if exc.code not in self.RETRYABLE or attempt == self._max_attempts:
-                    raise LLMError(f"{agent}: Gemini error {exc.code}: {exc.message}") from exc
-            except ValueError as exc:  # malformed JSON; retrying usually fixes it
-                if attempt == self._max_attempts:
-                    raise LLMError(f"{agent}: invalid structured output") from exc
-            await asyncio.sleep(min(20, 2**attempt) + random.random())
-        raise LLMError(f"{agent}: exhausted retries")
+        raise LLMError(f"{agent}: Gemini is overloaded right now (last: {last_error}). "
+                       "Please try again in a minute.")
 
 
 class ScriptedLLM:
