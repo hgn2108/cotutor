@@ -3,6 +3,7 @@ name = "cotutor"
 version = "0.2.0"
 description = "Multi-agent algorithm tutor: solves, verifies, and visually explains coding problems."
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

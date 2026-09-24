@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "cotutor-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -30,5 +30,6 @@
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
-  }
+  },
+  "license": "MIT"
 }

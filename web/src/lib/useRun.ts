@@ -92,6 +92,18 @@ function applyMessage(state: RunState, msg: ServerMessage): RunState {
   }
 }
 
+/** Free hosting sleeps when idle and needs up to a minute to wake, so keep trying for a while. */
+async function connectPatiently(connect: () => Promise<WebSocket>, attempts = 25, delayMs = 3000): Promise<WebSocket> {
+  for (let i = 1; ; i++) {
+    try {
+      return await connect()
+    } catch (err) {
+      if (i >= attempts) throw err
+      await new Promise((r) => setTimeout(r, delayMs))
+    }
+  }
+}
+
 export interface SolveOptions { apiKey?: string; fresh?: boolean }
 
 export function useRun() {
@@ -162,7 +174,7 @@ export function useRun() {
   const solve = useCallback(async (problem: string, opts: SolveOptions) => {
     dispatch({ type: 'start', problem })
     try {
-      const ws = await connect()
+      const ws = await connectPatiently(connect)
       ws.send(JSON.stringify({ type: 'solve', problem, api_key: opts.apiKey, fresh: opts.fresh }))
     } catch (err) {
       dispatch({ type: 'fail', message: String((err as Error).message ?? err) })

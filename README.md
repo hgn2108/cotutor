@@ -136,7 +136,7 @@ Cotutor supports both ways people use LLM apps:
 | Backend | Hugging Face Spaces (Docker, free CPU) via [`backend/Dockerfile`](backend/Dockerfile) | `uvicorn` locally, or the same container |
 | API key | Shared server key with a per-IP hourly limit; users can paste their own key in Settings | Your key in `.env` |
 
-The server only orchestrates. Code execution happens in each visitor's browser, so the backend fits on the smallest free instance and hosting untrusted code is not a concern.
+The server only orchestrates. Code execution happens in each visitor's browser, so the backend fits on the smallest free instance and hosting untrusted code is not a concern. Step-by-step instructions: [docs/DEPLOY.md](docs/DEPLOY.md). Pushes to `main` redeploy both automatically.
 
 ## Evaluation
 
@@ -160,3 +160,7 @@ The server only orchestrates. Code execution happens in each visitor's browser, 
 - [ ] Evaluation suite with published results
 - [ ] Practice mode: write your own solution, get the smallest failing input and a hint
 - [ ] Pattern review with spaced repetition
+
+## License
+
+[MIT](LICENSE)

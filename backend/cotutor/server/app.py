@@ -16,6 +16,7 @@ from .session import Session
 
 app = FastAPI(title="Cotutor", version="0.3.0")
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins,
+                   allow_origin_regex=settings.allowed_origin_regex,
                    allow_methods=["GET"], allow_headers=["*"])
 
 

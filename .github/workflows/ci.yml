@@ -33,3 +33,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the backend image
+        run: docker build -t cotutor-api backend
+      - name: Smoke test the container
+        run: |
+          docker run -d --name api -p 7860:7860 cotutor-api
+          for i in $(seq 1 30); do curl -sf localhost:7860/api/health && break; sleep 1; done
+          curl -sf localhost:7860/api/problems | python3 -c "import json,sys; assert len(json.load(sys.stdin)) == 12"
+          docker logs api

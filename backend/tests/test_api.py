@@ -61,3 +61,24 @@ def test_rejects_too_short(client):
         ws.receive_json()
         events = drive_session(ws, {"type": "solve", "problem": "hi"})
         assert events[-1]["type"] == "error"
+
+
+def test_websocket_rejects_foreign_origins(client):
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/api/session", headers={"origin": "https://evil.example"}) as ws:
+            ws.receive_json()
+    assert exc.value.code == 1008
+
+
+def test_origin_rules():
+    from cotutor.config import Settings
+
+    s = Settings(allowed_origins=["https://cotutor.vercel.app"],
+                 allowed_origin_regex=r"^https://cotutor(-[a-z0-9-]+)?\.vercel\.app$")
+    assert s.origin_allowed("https://cotutor.vercel.app")
+    assert s.origin_allowed("https://cotutor-git-main-hgn2108.vercel.app")
+    assert not s.origin_allowed("https://cotutor.vercel.app.evil.com")
+    assert not s.origin_allowed("http://localhost:3000")
+    assert s.origin_allowed(None)

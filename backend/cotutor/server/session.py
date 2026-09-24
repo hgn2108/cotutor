@@ -36,6 +36,9 @@ class Session:
             await self.ws.send_json(msg)
 
     async def serve(self) -> None:
+        if not settings.origin_allowed(self.ws.headers.get("origin")):
+            await self.ws.close(code=1008)  # policy violation: not one of our frontends
+            return
         await self.ws.accept()
         await self.send({"type": "hello", "features": deps.features()})
         try:

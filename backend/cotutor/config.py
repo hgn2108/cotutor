@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,6 +33,21 @@ class Settings:
     allowed_origins: list[str] = field(
         default_factory=lambda: _csv("COTUTOR_ALLOWED_ORIGINS", "http://localhost:5173")
     )
+    # Optional regex for extra origins, e.g. Vercel preview deployments:
+    #   ^https://cotutor(-[a-z0-9-]+)?\.vercel\.app$
+    allowed_origin_regex: str | None = os.getenv("COTUTOR_ALLOWED_ORIGIN_REGEX") or None
+
+    def origin_allowed(self, origin: str | None) -> bool:
+        """Browsers always send Origin on WebSockets; only our own frontends may connect.
+
+        Requests without an Origin (tests, CLI tools) are allowed: the check exists to stop
+        other websites from spending this server's API quota through a visitor's browser.
+        """
+        if origin is None:
+            return True
+        if origin in self.allowed_origins:
+            return True
+        return bool(self.allowed_origin_regex and re.fullmatch(self.allowed_origin_regex, origin))
 
 
 settings = Settings()

@@ -1,0 +1,47 @@
+name: Deploy backend
+
+# Pushes backend/ to the Hugging Face Space, which rebuilds the Docker image.
+# Needs a repository secret HF_TOKEN (write access) and a repository variable HF_SPACE
+# (e.g. "hgn2108/cotutor-api"). Without them this workflow does nothing.
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", "deploy/hf-space/**", ".github/workflows/deploy-backend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE: ${{ vars.HF_SPACE }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.HF_TOKEN != '' && env.HF_SPACE != ''
+      - name: Assemble Space contents
+        if: env.HF_TOKEN != '' && env.HF_SPACE != ''
+        run: |
+          mkdir -p space
+          cp -r backend/cotutor backend/pyproject.toml backend/uv.lock backend/Dockerfile backend/.dockerignore space/
+          rm -rf space/cotutor/data/cache
+          cp deploy/hf-space/README.md space/README.md
+      - name: Upload to Hugging Face
+        if: env.HF_TOKEN != '' && env.HF_SPACE != ''
+        run: |
+          pip install --quiet "huggingface_hub>=0.25"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
+              folder_path="space", repo_id=os.environ["HF_SPACE"], repo_type="space",
+              commit_message=f"Deploy {os.environ['GITHUB_SHA'][:7]}", delete_patterns=["*"],
+          )
+          PY
+      - name: Skipped
+        if: env.HF_TOKEN == '' || env.HF_SPACE == ''
+        run: echo "HF_TOKEN secret or HF_SPACE variable not set; skipping deploy."

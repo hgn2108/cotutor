@@ -49,7 +49,11 @@ export function Header(p: Props) {
           <Badge tone={tone} className="hidden sm:inline-flex" title="Code runs locally in your browser via Pyodide (WebAssembly)">
             <span className="size-1.5 rounded-full bg-current" />{label}
           </Badge>
-          {!p.connected && <Badge tone="bad">Server offline</Badge>}
+          {!p.connected && (
+            <Badge tone="warn" title="The free server sleeps when idle and can take up to a minute to wake up.">
+              <span className="size-1.5 animate-pulse rounded-full bg-current" />Waking up server…
+            </Badge>
+          )}
           <a href="https://github.com/hgn2108/cotutor" target="_blank" rel="noreferrer" className="rounded-lg p-2 text-muted hover:bg-sunken hover:text-ink" aria-label="GitHub">
             <GithubMark />
           </a>
