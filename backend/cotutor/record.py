@@ -40,10 +40,30 @@ async def record(title: str, problem: str, known: KnownProblem | None, out: Path
     if not summary.get("verified") or not summary.get("lesson"):
         why = summary.get("error") or ("lesson incomplete" if summary.get("verified") else "not verified")
         print(f"  not saved ({why})")
+        for line in failure_details(events):
+            print(f"    {line}")
         return False
     _save(out, {"problem": problem, "recording": "live",
                 "models": settings.smart_models + settings.fast_models, "events": events})
     return True
+
+
+def failure_details(events: list[dict]) -> list[str]:
+    """Why the last verification failed, so flaky runs can be diagnosed afterwards."""
+    runs = [e["data"] for e in events if e.get("type") == "artifact" and e["name"] == "verification"]
+    if not runs:
+        return []
+    last = runs[-1]
+    cases = {c["id"]: c for c in last["cases"]}
+    lines = [f"load error: {last['load_error']}"] if last.get("load_error") else []
+    for r in last["results"]:
+        if r["status"] in ("fail", "error", "timeout"):
+            args = json.dumps(cases.get(r["id"], {}).get("args"))[:80]
+            detail = r.get("error") or f"expected {r.get('expected')!r:.60} got {r.get('got')!r:.60}"
+            lines.append(f"{r['id']} [{r['status']}] args={args} {detail}")
+    if last.get("counterexample"):
+        lines.append(f"counterexample: {json.dumps(last['counterexample'])[:200]}")
+    return lines[:6]
 
 
 def _save(out: Path, recording: dict) -> None:

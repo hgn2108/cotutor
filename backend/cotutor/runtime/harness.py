@@ -489,7 +489,8 @@ def job_trace(job, emit):
     params = spec["params"]
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
     max_steps = job.get("max_steps", 600)
-    steps, truncated = [], False
+    max_bytes = job.get("max_bytes", 1_500_000)
+    steps, truncated, size = [], False, [0]
 
     def tracer(frame, event, arg):
         nonlocal truncated
@@ -515,6 +516,12 @@ def job_trace(job, emit):
                     "depth": depth, "locals": local_vars}
             if event == "return":
                 step["ret"] = snapshot(arg)
+            # Grids snapshotted at every step add up fast; keep the payload browser-sized.
+            size[0] += len(json.dumps(step, default=str))
+            if size[0] > max_bytes:
+                truncated = True
+                sys.settrace(None)
+                return None
             steps.append(step)
         return tracer
 

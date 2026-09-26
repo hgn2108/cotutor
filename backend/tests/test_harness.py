@@ -107,3 +107,15 @@ def test_slow_brute_force_does_not_hang_or_blame_the_solution():
     by_id = {c["id"]: c for c in res["cases"]}
     assert by_id["small"]["status"] == "pass" and by_id["small"]["expected"] == 3
     assert by_id["huge"]["status"] == "ran" and by_id["huge"]["expected_source"] == "none"
+
+
+def test_trace_of_a_big_grid_stays_browser_sized():
+    spec = {"entry": "count", "params": [{"name": "grid", "type": "List[List[str]]"}],
+            "return_type": "int", "comparison": "exact"}
+    code = ("def count(grid):\n    total = 0\n"
+            "    for r in range(len(grid)):\n        for c in range(len(grid[0])):\n"
+            "            total += grid[r][c] == '1'\n    return total\n")
+    grid = [["1" if (r + c) % 2 else "0" for c in range(60)] for r in range(60)]
+    res = run({"kind": "trace", "spec": spec, "code": code, "args": [grid], "max_bytes": 200_000})
+    assert res["ok"] and res["truncated"]
+    assert len(json.dumps(res)) < 400_000

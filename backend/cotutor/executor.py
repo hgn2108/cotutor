@@ -67,6 +67,7 @@ class LocalExecutor:
             sys.executable, "-I", str(HARNESS_PATH),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
+            limit=32 * 1024 * 1024,  # results arrive as one JSON line; traces can be large
             env={"PATH": os.environ.get("PATH", ""), "PYTHONHASHSEED": "0"},
         )
         events: list[dict] = []
@@ -92,6 +93,11 @@ class LocalExecutor:
             proc.kill()
             await proc.wait()
             return finalize_timeout(job, events, timeout_s)
+        except (ValueError, OSError) as exc:  # e.g. an oversized or malformed output line
+            proc.kill()
+            await proc.wait()
+            return {"ok": False, "error": {"type": "ExecutorError", "where": [],
+                                           "message": f"{type(exc).__name__}: {exc}"[:300]}}
         if result is None:
             return {"ok": False, "error": {"type": "Crash", "where": [],
                                            "message": "Process exited without a result "
