@@ -144,7 +144,8 @@ class Pipeline:
         return spec
 
     async def _design_tests(self, spec: ProblemSpec) -> TestPlan:
-        async with self.ctx.stage("design_tests", "Test Designer: edge cases + a slow reference solution") as st:
+        label = "Test Designer: edge cases + a slow reference solution"
+        async with self.ctx.stage("design_tests", label) as st:
             plan, u = await agents.design_tests(self.ctx.llm, spec)
             st.usage(u)
             st.note(f"{len(plan.cases)} targeted inputs, brute-force reference, random input "
