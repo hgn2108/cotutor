@@ -133,7 +133,7 @@
    "title": "Encode and Decode Strings",
    "difficulty": "medium",
    "category": "Arrays & Hashing",
-   "kind": "special",
+   "kind": "codec",
    "class_name": "Codec",
    "roadmaps": [
     "neetcode150",
@@ -716,7 +716,7 @@
    "title": "Copy List with Random Pointer",
    "difficulty": "medium",
    "category": "Linked List",
-   "kind": "special",
+   "kind": "function",
    "entry": "copyRandomList",
    "params": [
     "head"
@@ -751,7 +751,7 @@
    "title": "Linked List Cycle",
    "difficulty": "easy",
    "category": "Linked List",
-   "kind": "special",
+   "kind": "function",
    "entry": "hasCycle",
    "params": [
     "head"
@@ -944,7 +944,7 @@
    "title": "Lowest Common Ancestor of a Binary Search Tree",
    "difficulty": "medium",
    "category": "Trees",
-   "kind": "special",
+   "kind": "function",
    "entry": "lowestCommonAncestor",
    "params": [
     "root",
@@ -1090,7 +1090,7 @@
    "title": "Serialize and Deserialize Binary Tree",
    "difficulty": "hard",
    "category": "Trees",
-   "kind": "special",
+   "kind": "codec",
    "class_name": "Codec",
    "roadmaps": [
     "neetcode150",
@@ -1460,7 +1460,7 @@
    "title": "Clone Graph",
    "difficulty": "medium",
    "category": "Graphs",
-   "kind": "special",
+   "kind": "function",
    "entry": "cloneGraph",
    "params": [
     "node"

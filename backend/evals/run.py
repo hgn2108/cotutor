@@ -23,8 +23,11 @@ from cotutor.llm import GeminiClient
 from cotutor.pipeline import KnownProblem, Pipeline, PipelineConfig
 
 from .golden import GOLDEN, Golden
+from .novel import NOVEL
 from .report import aggregate, markdown
 from .score import score_run
+
+SETS = {"famous": GOLDEN, "novel": NOVEL}
 
 EVALS = Path(__file__).parent
 RESULTS = EVALS / "results"
@@ -41,16 +44,21 @@ def recording_for(golden: Golden) -> Path | None:
 
 
 async def live_events(golden: Golden, llm, debug: bool) -> list[dict]:
-    item = library.roadmap_problem(golden.id)
-    known = (KnownProblem(item["class_name"]) if item["kind"] == "design"
-             else KnownProblem(item["entry"], tuple(item["params"])))
+    """Novel problems arrive as pasted statements; famous ones by name, like a roadmap lesson."""
+    if golden.statement:
+        problem, known = golden.statement, None
+    else:
+        item = library.roadmap_problem(golden.id)
+        problem = library.name_prompt(item)
+        known = (KnownProblem(item["class_name"]) if item["kind"] in ("design", "codec")
+                 else KnownProblem(item["entry"], tuple(item["params"])))
     events: list[dict] = []
 
     async def emit(ev):
         events.append(ev)
 
     config = PipelineConfig(max_debug_attempts=settings.max_debug_attempts if debug else 0)
-    await Pipeline(llm, LocalExecutor(), emit, config).run(library.name_prompt(item), known)
+    await Pipeline(llm, LocalExecutor(), emit, config).run(problem, known)
     return events
 
 
@@ -74,10 +82,14 @@ async def main() -> None:
     parser.add_argument("--only", nargs="*", default=[])
     parser.add_argument("--name", default="")
     parser.add_argument("--resume", help="continue a previous live run directory")
+    parser.add_argument("--set", choices=sorted(SETS), default="famous",
+                        help="famous: Blind 75 / NeetCode problems by name; novel: original statements")
     parser.add_argument("--pause", type=float, default=10, help="seconds between live runs")
     args = parser.parse_args()
 
-    goldens = [g for g in GOLDEN if not args.only or g.id in args.only]
+    goldens = [g for g in SETS[args.set] if not args.only or g.id in args.only]
+    if args.set == "novel" and not args.live:
+        raise SystemExit("Novel problems have no recordings; use --live.")
     if args.limit:
         goldens = goldens[: args.limit]
     scores = []
@@ -108,8 +120,11 @@ async def main() -> None:
                 print(f"\nStopping: the API quota looks exhausted. Resume later with:\n"
                       f"  uv run python -m evals.run --live --resume {runs_dir}")
                 break
-        name = args.name or ("live-no-debug" if args.no_debug else "live")
-        note = f"Fresh runs from problem names · models {settings.smart_models[0]} with fallbacks"
+        name = args.name or "-".join(["live", *(["novel"] if args.set == "novel" else []),
+                                      *(["no-debug"] if args.no_debug else [])])
+        note = (("Original problems given as pasted statements" if args.set == "novel"
+                 else "Fresh runs from problem names")
+                + f" · models {settings.smart_models[0]} with fallbacks")
     else:
         missing = []
         for g in goldens:

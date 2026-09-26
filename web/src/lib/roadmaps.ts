@@ -9,7 +9,7 @@ export interface RoadmapProblem {
   title: string
   difficulty: 'easy' | 'medium' | 'hard'
   category: string
-  kind: 'function' | 'design' | 'special'
+  kind: 'function' | 'design' | 'codec' | 'special'
   entry?: string
   params?: string[]
   class_name?: string

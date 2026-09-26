@@ -30,6 +30,7 @@ class Golden:
     kind: str = "function"
     in_place_arg: int | None = None
     checker: str = ""
+    statement: str = ""                      # novel problems: the text the pipeline receives
     extra: dict = field(default_factory=dict)
 
     def spec(self) -> dict[str, Any]:
@@ -568,6 +569,120 @@ def missingNumber(nums):
     return len(nums) * (len(nums) + 1) // 2 - sum(nums)
 """, [[[3, 0, 1]], [[0, 1]], [[9, 6, 4, 2, 3, 5, 7, 0, 1]], [[0]], [[1]]],
         [([[3, 0, 1]], 2), ([[9, 6, 4, 2, 3, 5, 7, 0, 1]], 8)], "O(n)", ("bit", "xor", "sum", "math", "gauss")),
+    # ---------------------------------------------------------------- Special structures
+    Golden("clone-graph", "cloneGraph", [("node", "Optional[GraphNode]")], """
+def cloneGraph(node):
+    if not node:
+        return None
+    copies = {node: Node(node.val)}
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        for m in n.neighbors:
+            if m not in copies:
+                copies[m] = Node(m.val)
+                stack.append(m)
+            copies[n].neighbors.append(copies[m])
+    return copies[node]
+""", [[[[2, 4], [1, 3], [2, 4], [1, 3]]], [[[]]], [[]], [[[2], [1]]], [[[2, 3], [1, 3], [1, 2]]]],
+        [([[[2, 4], [1, 3], [2, 4], [1, 3]]], [[2, 4], [1, 3], [2, 4], [1, 3]]), ([[]], [])],
+        "O(V + E)", ("dfs", "bfs", "hash", "graph", "clone"), return_type="Optional[GraphNode]"),
+    Golden("copy-list-with-random-pointer", "copyRandomList", [("head", "Optional[RandomNode]")], """
+def copyRandomList(head):
+    copies, n = {None: None}, head
+    while n:
+        copies[n] = Node(n.val)
+        n = n.next
+    n = head
+    while n:
+        copies[n].next, copies[n].random = copies[n.next], copies[n.random]
+        n = n.next
+    return copies[head]
+""", [[[[7, None], [13, 0], [11, 4], [10, 2], [1, 0]]], [[[1, 1], [2, 1]]], [[[3, None], [3, 0], [3, None]]], [[]]],
+        [([[[1, 1], [2, 1]]], [[1, 1], [2, 1]])], "O(n)", ("hash", "interleav", "weav", "map", "copy"),
+        return_type="Optional[RandomNode]"),
+    Golden("linked-list-cycle", "hasCycle", [("head", L)], """
+def hasCycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        if slow is fast:
+            return True
+    return False
+""", [[{"values": [3, 2, 0, -4], "pos": 1}], [{"values": [1, 2], "pos": 0}], [{"values": [1], "pos": -1}],
+      [{"values": [], "pos": -1}], [{"values": [1, 2, 3, 4, 5], "pos": 4}]],
+        [([{"values": [3, 2, 0, -4], "pos": 1}], True), ([{"values": [1], "pos": -1}], False)],
+        "O(n)", ("fast", "slow", "floyd", "tortoise", "two pointer")),
+    Golden("lowest-common-ancestor-of-a-binary-search-tree", "lowestCommonAncestor",
+           [("root", "TreeNode"), ("p", "TreeNode"), ("q", "TreeNode")], """
+def lowestCommonAncestor(root, p, q):
+    while root:
+        if p.val < root.val and q.val < root.val:
+            root = root.left
+        elif p.val > root.val and q.val > root.val:
+            root = root.right
+        else:
+            return root
+""", [[[6, 2, 8, 0, 4, 7, 9, None, None, 3, 5], 2, 8], [[6, 2, 8, 0, 4, 7, 9, None, None, 3, 5], 2, 4],
+      [[2, 1], 2, 1], [[6, 2, 8, 0, 4, 7, 9, None, None, 3, 5], 3, 5], [[6, 2, 8, 0, 4, 7, 9, None, None, 3, 5], 0, 9]],
+        [([[2, 1], 2, 1], [2, 1])], "O(h)", ("bst", "binary search tree", "split", "ordering", "compare"),
+        return_type="TreeNode"),
+    Golden("serialize-and-deserialize-binary-tree", "Codec", [("root", T)], """
+class Codec:
+    def serialize(self, root):
+        return json.dumps(tree_values(root))
+
+    def deserialize(self, data):
+        return tree_from(json.loads(data))
+
+
+import json
+
+
+def tree_values(root):
+    out, queue = [], collections.deque([root])
+    while queue:
+        n = queue.popleft()
+        out.append(n.val if n else None)
+        if n:
+            queue += [n.left, n.right]
+    while out and out[-1] is None:
+        out.pop()
+    return out
+
+
+def tree_from(vals):
+    if not vals:
+        return None
+    root = TreeNode(vals[0])
+    queue, i = collections.deque([root]), 1
+    while queue and i < len(vals):
+        n = queue.popleft()
+        for side in ("left", "right"):
+            if i < len(vals) and vals[i] is not None:
+                setattr(n, side, TreeNode(vals[i]))
+                queue.append(getattr(n, side))
+            i += 1
+    return root
+""", [[[1, 2, 3, None, None, 4, 5]], [[]], [[1]], [[-1, None, -2, None, -3]], [[5, 4, 7, 3, None, 2, None, -1, None, 9]]],
+        [([[1, 2, 3, None, None, 4, 5]], [1, 2, 3, None, None, 4, 5])], "O(n)",
+        ("bfs", "dfs", "preorder", "level", "serializ", "traversal"), return_type=T, kind="codec"),
+    Golden("encode-and-decode-strings", "Codec", [("strs", "List[str]")], """
+class Codec:
+    def encode(self, strs):
+        return "".join(f"{len(s)}#{s}" for s in strs)
+
+    def decode(self, s):
+        out, i = [], 0
+        while i < len(s):
+            j = s.index("#", i)
+            n = int(s[i:j])
+            out.append(s[j + 1:j + 1 + n])
+            i = j + 1 + n
+        return out
+""", [[["lint", "code", "love", "you"]], [[""]], [[]], [["#", "12#ab", ""]], [["a,b", "c;d", "\\n"]]],
+        [([["we", "say", ":", "yes"]], ["we", "say", ":", "yes"])], "O(n)",
+        ("length", "prefix", "delimit", "escap", "encod"), return_type="List[str]", kind="codec"),
     # ---------------------------------------------------------------- Design
     Golden("lru-cache", "LRUCache", [("operations", "List[str]"), ("arguments", "List[List]")], """
 class LRUCache:

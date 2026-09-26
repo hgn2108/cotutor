@@ -22,14 +22,23 @@ class Param(BaseModel):
 class Example(BaseModel):
     args_json: str = Field(description="JSON array of positional arguments, e.g. '[[2,7,11,15], 9]'.")
     expected_json: str = Field(description="JSON of the expected return value.")
+    from_statement: bool = Field(description=(
+        "True if this example (input and output) appears in the user's statement; False if you "
+        "made it up. Invented examples are double-checked, never treated as ground truth."))
 
 
 class ProblemSpec(BaseModel):
     is_solvable: bool = Field(description="False if the input is not a well-defined coding problem.")
+    unsupported_reason: str = Field(description=(
+        "Empty if the problem can be solved and verified as a Python function or class. Otherwise "
+        "one sentence on why not: interactive/judge APIs (e.g. isBadVersion, guess), randomized "
+        "or non-deterministic output, SQL, shell or concurrency problems, output by printing, or "
+        "needing third-party libraries."))
     title: str
-    kind: Literal["function", "design"] = Field(description=(
+    kind: Literal["function", "design", "codec"] = Field(description=(
         "'design' when the task is to implement a class whose methods are called in sequence "
-        "(LRU Cache, Min Stack, Trie...); otherwise 'function'."))
+        "(LRU Cache, Min Stack, Trie...); 'codec' for encode/decode round trips (Codec class with "
+        "encode/decode or serialize/deserialize); otherwise 'function'."))
     summary: str = Field(description=(
         "Restatement in exactly this shape, each on its own line: 'Input: ...', 'Output: ...', "
         "then 'Rules: ...' for any constraint that matters. Plain words, no story."))

@@ -165,3 +165,43 @@ async def test_multi_variable_claims_never_yield_already_optimal():
     script["solver"][0] = script["solver"][0].model_copy(update={"time_complexity": "O(n log max(piles))"})
     _, events, _ = await run_pipeline(script)
     assert artifacts(events, "lesson_intro")[0]["brute_is_optimal"] is False
+
+
+async def test_unverifiable_problems_are_refused_with_a_reason():
+    script = two_sum_script()
+    script["analyst"][0] = script["analyst"][0].model_copy(
+        update={"unsupported_reason": "It depends on a hidden judge API (isBadVersion)."})
+    summary, events, llm = await run_pipeline(script)
+    assert summary["error"] == "unsupported"
+    err = next(e for e in events if e["type"] == "error")
+    assert "isBadVersion" in err["message"] and not llm.calls["solver"]
+
+
+def _with_example(expected_json, from_statement):
+    from cotutor.schemas import Example
+
+    script = two_sum_script()
+    spec = script["analyst"][0]
+    bad = Example(args_json="[[1,5,9,2],11]", expected_json=expected_json, from_statement=from_statement)
+    script["analyst"][0] = spec.model_copy(update={"examples": [*spec.examples, bad]})
+    # Without a custom checker, expected values are compared directly (a checker would already
+    # accept any valid pair and never consult the example's expected value).
+    script["test_designer"][0] = script["test_designer"][0].model_copy(update={"checker_code": ""})
+    return script
+
+
+async def test_wrong_made_up_example_is_corrected_by_consensus():
+    # [1,5,9,2], 11 -> the pair is [2,3] (9+2); the invented example claims [0,2].
+    _, events, _ = await run_pipeline(_with_example("[0,2]", from_statement=False))
+    oracle = artifacts(events, "oracle")[0]
+    assert oracle["trusted"] and oracle["corrected_examples"] == ["ex3"]
+    first = artifacts(events, "verification")[0]
+    ex3 = next(c for c in first["cases"] if c["id"] == "ex3")
+    assert ex3["expected"] == [2, 3] and ex3["label"].endswith("(corrected)")
+    assert next(r for r in first["results"] if r["id"] == "ex3")["status"] == "pass"
+
+
+async def test_wrong_statement_example_is_not_overridden():
+    _, events, _ = await run_pipeline(_with_example("[0,2]", from_statement=True))
+    oracle = artifacts(events, "oracle")[0]
+    assert oracle["trusted"] is False and oracle["corrected_examples"] == []

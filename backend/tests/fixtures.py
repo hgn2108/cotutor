@@ -24,14 +24,14 @@ from cotutor.schemas import (
 )
 
 SPEC = ProblemSpec(
-    is_solvable=True, title="Two Sum", kind="function",
+    is_solvable=True, unsupported_reason="", title="Two Sum", kind="function",
     summary="Given an integer array nums and an integer target, return the indices of two "
             "different elements that add up to target. Exactly one answer exists.",
     entry="twoSum",
     params=[Param(name="nums", type="List[int]"), Param(name="target", type="int")],
     return_type="List[int]",
-    examples=[Example(args_json="[[2,7,11,15],9]", expected_json="[0,1]"),
-              Example(args_json="[[3,2,4],6]", expected_json="[1,2]")],
+    examples=[Example(args_json="[[2,7,11,15],9]", expected_json="[0,1]", from_statement=True),
+              Example(args_json="[[3,2,4],6]", expected_json="[1,2]", from_statement=True)],
     constraints=["2 <= len(nums) <= 10^4", "exactly one valid answer"],
     comparison="unordered", multiple_valid_answers=True, in_place_arg=-1,
     pattern_tags=["hash map"], difficulty="easy",

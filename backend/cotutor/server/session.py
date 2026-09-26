@@ -72,12 +72,9 @@ class Session:
         item = library.roadmap_problem(str(ref))
         if item is None:
             return "Unknown roadmap problem."
-        if item["kind"] == "special":
-            return ("This problem needs node structures that aren't supported yet (cycles, random "
-                    "pointers, graph nodes or round-trip codecs).")
         if library.library_match(item["title"]):
             known = None
-        elif item["kind"] == "design":
+        elif item["kind"] in ("design", "codec"):
             known = KnownProblem(item["class_name"])
         else:
             known = KnownProblem(item["entry"], tuple(item["params"]))

@@ -13,12 +13,22 @@ DESIGN_NOTE = (
     "the constructor and for methods returning nothing, e.g. [null, null, 1]."
 )
 
+STRUCTURES_NOTE = (
+    "Special inputs use these types and JSON formats: 'Optional[ListNode]' is a list of values "
+    "(for a list with a cycle: {\"values\": [3,2,0,-4], \"pos\": 1}); 'Optional[TreeNode]' "
+    "is LeetCode level order with null; a TreeNode parameter that refers to a node inside an "
+    "earlier tree argument (e.g. p and q in lowest common ancestor) is given as that node's "
+    "value; 'Optional[GraphNode]' is LeetCode's 1-indexed adjacency list; 'Optional[RandomNode]' "
+    "is [[val, random_index or null], ...]. Code builds these with LeetCode's classes ListNode, "
+    "TreeNode and Node(val, next, random) / Node(val, neighbors). Codec problems take one "
+    "parameter (the value to encode) and return the same type; the check is decode(encode(x)) == x."
+)
+
 PYTHON_ENV_NOTE = (
     "Code runs on CPython 3.12 with only the standard library. `List`, `Optional`, "
     "`collections`, `heapq`, `bisect`, `math`, `functools`, `itertools` and LeetCode's "
-    "`ListNode(val, next)` / `TreeNode(val, left, right)` are pre-imported. ListNode/TreeNode "
-    "arguments are passed as real nodes; in JSON they are written as lists (trees in "
-    "LeetCode level order with null)."
+    "`ListNode(val, next)`, `TreeNode(val, left, right)` and `Node` are pre-imported and node "
+    "arguments are passed as real nodes. " + STRUCTURES_NOTE
 )
 
 

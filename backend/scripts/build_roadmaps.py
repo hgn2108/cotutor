@@ -16,9 +16,8 @@ import json
 import re
 from pathlib import Path
 
-# kind: "function" (supported) | "design" (class with a sequence of method calls)
-#       | "special" (needs node structures beyond ListNode/TreeNode: cycles, random pointers,
-#         graph nodes, node references as arguments)
+# kind: "function" | "design" (a class driven by a sequence of method calls)
+#       | "codec" (encode/decode round trip)
 # Rows: (number, title, difficulty, signature, blind75, kind[, neetcode150])
 E, M, H = "easy", "medium", "hard"
 CATEGORIES: list[tuple[str, list[tuple]]] = [
@@ -28,7 +27,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (1, "Two Sum", E, "twoSum(nums, target)", True, "function"),
         (49, "Group Anagrams", M, "groupAnagrams(strs)", True, "function"),
         (347, "Top K Frequent Elements", M, "topKFrequent(nums, k)", True, "function"),
-        (271, "Encode and Decode Strings", M, "Codec", True, "special"),  # tested as a round trip
+        (271, "Encode and Decode Strings", M, "Codec", True, "codec"),
         (238, "Product of Array Except Self", M, "productExceptSelf(nums)", True, "function"),
         (36, "Valid Sudoku", M, "isValidSudoku(board)", False, "function"),
         (128, "Longest Consecutive Sequence", M, "longestConsecutive(nums)", True, "function"),
@@ -71,9 +70,9 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (21, "Merge Two Sorted Lists", E, "mergeTwoLists(list1, list2)", True, "function"),
         (143, "Reorder List", M, "reorderList(head)", True, "function"),
         (19, "Remove Nth Node From End of List", M, "removeNthFromEnd(head, n)", True, "function"),
-        (138, "Copy List with Random Pointer", M, "copyRandomList(head)", False, "special"),
+        (138, "Copy List with Random Pointer", M, "copyRandomList(head)", False, "function"),
         (2, "Add Two Numbers", M, "addTwoNumbers(l1, l2)", False, "function"),
-        (141, "Linked List Cycle", E, "hasCycle(head)", True, "special"),
+        (141, "Linked List Cycle", E, "hasCycle(head)", True, "function"),
         (287, "Find the Duplicate Number", M, "findDuplicate(nums)", False, "function"),
         (146, "LRU Cache", M, "LRUCache", False, "design"),
         (23, "Merge k Sorted Lists", H, "mergeKLists(lists)", True, "function"),
@@ -86,7 +85,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (110, "Balanced Binary Tree", E, "isBalanced(root)", False, "function"),
         (100, "Same Tree", E, "isSameTree(p, q)", True, "function"),
         (572, "Subtree of Another Tree", E, "isSubtree(root, subRoot)", True, "function"),
-        (235, "Lowest Common Ancestor of a Binary Search Tree", M, "lowestCommonAncestor(root, p, q)", True, "special"),
+        (235, "Lowest Common Ancestor of a Binary Search Tree", M, "lowestCommonAncestor(root, p, q)", True, "function"),
         (102, "Binary Tree Level Order Traversal", M, "levelOrder(root)", True, "function"),
         (199, "Binary Tree Right Side View", M, "rightSideView(root)", False, "function"),
         (1448, "Count Good Nodes in Binary Tree", M, "goodNodes(root)", False, "function"),
@@ -94,7 +93,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (230, "Kth Smallest Element in a BST", M, "kthSmallest(root, k)", True, "function"),
         (105, "Construct Binary Tree from Preorder and Inorder Traversal", M, "buildTree(preorder, inorder)", True, "function"),
         (124, "Binary Tree Maximum Path Sum", H, "maxPathSum(root)", True, "function"),
-        (297, "Serialize and Deserialize Binary Tree", H, "Codec", True, "special"),  # round trip
+        (297, "Serialize and Deserialize Binary Tree", H, "Codec", True, "codec"),
     ]),
     ("Heap / Priority Queue", [
         (703, "Kth Largest Element in a Stream", E, "KthLargest", False, "design"),
@@ -124,7 +123,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
     ("Graphs", [
         (200, "Number of Islands", M, "numIslands(grid)", True, "function"),
         (695, "Max Area of Island", M, "maxAreaOfIsland(grid)", False, "function"),
-        (133, "Clone Graph", M, "cloneGraph(node)", True, "special"),
+        (133, "Clone Graph", M, "cloneGraph(node)", True, "function"),
         (286, "Walls and Gates", M, "wallsAndGates(rooms)", False, "function"),
         (994, "Rotting Oranges", M, "orangesRotting(grid)", False, "function"),
         (417, "Pacific Atlantic Water Flow", M, "pacificAtlantic(heights)", True, "function"),
@@ -259,5 +258,5 @@ if __name__ == "__main__":
     data = build()
     out.write_text(json.dumps(data, indent=1) + "\n")
     counts = {r["id"]: sum(r["id"] in p["roadmaps"] for p in data["problems"]) for r in data["roadmaps"]}
-    kinds = {k: sum(p["kind"] == k for p in data["problems"]) for k in ("function", "design", "special")}
+    kinds = {k: sum(p["kind"] == k for p in data["problems"]) for k in ("function", "design", "codec")}
     print(f"wrote {out.name}: {len(data['problems'])} problems, {counts}, {kinds}")

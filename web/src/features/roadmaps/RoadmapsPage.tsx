@@ -86,7 +86,7 @@ export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, impor
           <div className="min-w-[220px] flex-1">
             <div className="flex items-baseline justify-between text-sm">
               <span className="font-medium">{learned} of {open.length} learned</span>
-              <span className="text-xs text-faint">{problems.length - open.length} coming soon</span>
+              {problems.length > open.length && <span className="text-xs text-faint">{problems.length - open.length} coming soon</span>}
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-sunken">
               <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(learned / Math.max(1, open.length)) * 100}%` }} />
@@ -148,8 +148,7 @@ export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, impor
         {!visible.length && <p className="py-8 text-center text-sm text-faint">No problems match these filters.</p>}
       </div>
       <p className="mt-6 text-center text-[11.5px] leading-relaxed text-faint">
-        Progress is saved in this browser only. Lesson content is generated and verified by Cotutor; problem statements belong to LeetCode.<br />
-        A few problems that need special structures (graph nodes, cycles, random pointers, round-trip codecs) are coming soon.
+        Progress is saved in this browser only. Lesson content is generated and verified by Cotutor; problem statements belong to LeetCode.
       </p>
     </Shell>
   )

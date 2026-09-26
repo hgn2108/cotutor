@@ -44,7 +44,8 @@ def test_session_resolves_roadmap_refs():
     # Design problems start from the class name.
     assert resolve({"ref": "lru-cache"}) == ("LeetCode 146: LRU Cache\nClass: LRUCache",
                                              KnownProblem("LRUCache"))
-    assert "aren't supported yet" in resolve({"ref": "clone-graph"})
+    assert resolve({"ref": "clone-graph"})[1] == KnownProblem("cloneGraph", ("node",))
+    assert resolve({"ref": "serialize-and-deserialize-binary-tree"})[1] == KnownProblem("Codec")
     assert resolve({"ref": "nope"}) == "Unknown roadmap problem."
 
 
@@ -85,4 +86,4 @@ def test_roadmaps_endpoint_marks_recorded_lessons():
     probs = {p["id"]: p for p in TestClient(app).get("/api/roadmaps").json()["problems"]}
     assert probs["two-sum"]["recorded"] is True           # library recording reused
     assert probs["koko-eating-bananas"]["recorded"] is True  # recorded from its name
-    assert probs["clone-graph"]["recorded"] is False  # special structure: never recorded
+    assert probs["alien-dictionary"]["recorded"] is False  # not recorded yet

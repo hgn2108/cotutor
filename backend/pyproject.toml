@@ -42,3 +42,5 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 [tool.ruff.lint.per-file-ignores]
 "scripts/build_roadmaps.py" = ["E501"]  # one row per problem reads best as a table
 "evals/golden.py" = ["E501"]  # test data: one golden problem per block
+"evals/novel.py" = ["E501"]
+"tests/*" = ["E501"]  # inline test data

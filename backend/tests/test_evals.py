@@ -5,6 +5,7 @@ import pytest
 from cotutor import library
 from cotutor.executor import LocalExecutor
 from evals.golden import GOLDEN
+from evals.novel import NOVEL
 
 ROADMAP_IDS = {p["id"] for p in library.roadmaps()["problems"]}
 
@@ -14,7 +15,13 @@ def test_golden_ids_are_roadmap_problems():
     assert len({g.id for g in GOLDEN}) == len(GOLDEN)
 
 
-@pytest.mark.parametrize("golden", GOLDEN, ids=lambda g: g.id)
+def test_novel_problems_have_statements_and_unique_ids():
+    ids = [g.id for g in GOLDEN + NOVEL]
+    assert len(set(ids)) == len(ids)
+    assert all(g.statement.strip() and g.entry in g.statement for g in NOVEL)
+
+
+@pytest.mark.parametrize("golden", GOLDEN + NOVEL, ids=lambda g: g.id)
 async def test_golden_solution_is_correct_and_runs_every_hidden_case(golden):
     known = [{"id": f"check{i}", "args": args, "expected": exp}
              for i, (args, exp) in enumerate(golden.checks)]

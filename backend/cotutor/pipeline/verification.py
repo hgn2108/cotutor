@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import agents
+from ..runtime.harness import outputs_match
 from ..schemas import ProblemSpec, Solution, TestPlan
 from .context import RunContext, harness_spec, parse_args
 
@@ -58,7 +59,8 @@ class Verifier:
                 continue
             if args is not None:
                 cases.append({"id": f"ex{i}", "args": args, "expected": expected,
-                              "source": "example", "label": f"Example {i}"})
+                              "source": "example", "label": f"Example {i}",
+                              "from_statement": ex.from_statement})
         for i, draft in enumerate(plan.cases, 1):
             args = parse_args(draft.args_json)
             if args is not None:
@@ -68,9 +70,16 @@ class Verifier:
         return cases
 
     async def validate_oracle(self, spec: ProblemSpec, plan: TestPlan,
-                              cases: list[dict[str, Any]]) -> Oracle:
-        """Verify the verifier: the oracle must reproduce the problem's own examples."""
+                              cases: list[dict[str, Any]], solution: Solution) -> Oracle:
+        """Verify the verifier: the oracle must reproduce the problem's own examples.
+
+        Examples copied from the user's statement are authoritative. Examples the Analyst made up
+        (statements without examples) can be wrong: if the brute force and the solution, written
+        independently, agree with each other against a made-up example, the example is corrected
+        instead of "fixing" correct code to match it.
+        """
         oracle = Oracle(plan.reference_solution, plan.checker_code.strip() or None)
+        corrected: list[str] = []
         async with self.ctx.stage("oracle", "Verify the verifier: check oracle on examples") as st:
             examples = [c for c in cases if c["source"] == "example"]
             if not examples:
@@ -80,16 +89,40 @@ class Verifier:
                     "kind": "tests", "spec": harness_spec(spec), "code": oracle.reference_code,
                     "checker_code": oracle.checker_code, "cases": _for_harness(examples),
                 })
-                oracle.trusted = bool(res.get("ok") and all(c["status"] == "pass" for c in res["cases"]))
-                if oracle.trusted:
+                failed = [c for c in res.get("cases", []) if c["status"] != "pass"] if res.get("ok") else None
+                if failed:
+                    corrected = await self._correct_invented(spec, solution, examples, failed)
+                oracle.trusted = failed is not None and (not failed or len(corrected) == len(failed))
+                if oracle.trusted and corrected:
+                    st.note(f"Corrected {len(corrected)} made-up example(s): the brute force and the "
+                            "solution independently agreed on a different answer.", "warning")
+                elif oracle.trusted:
                     st.note(f"Brute-force oracle matches all {len(examples)} examples; "
                             "using it to compute expected outputs.")
                 else:
                     st.note("Oracle disagreed with the examples, so only the examples are "
                             "checked for correctness.", "warning")
-        await self.ctx.artifact("oracle", {"trusted": oracle.trusted,
+        await self.ctx.artifact("oracle", {"trusted": oracle.trusted, "corrected_examples": corrected,
                                            "has_checker": bool(oracle.checker_code)})
         return oracle
+
+    async def _correct_invented(self, spec: ProblemSpec, solution: Solution,
+                                examples: list[dict[str, Any]], failed: list[dict]) -> list[str]:
+        by_id = {c["id"]: c for c in examples}
+        if any(by_id[f["id"]].get("from_statement", True) or f["status"] != "fail" for f in failed):
+            return []  # a statement example disagrees: the oracle is wrong, not the example
+        res = await self.ctx.execute({
+            "kind": "tests", "spec": harness_spec(spec), "code": solution.code,
+            "cases": [{"id": f["id"], "args": by_id[f["id"]]["args"]} for f in failed],
+        })
+        sol_out = {c["id"]: c.get("got") for c in res.get("cases", [])} if res.get("ok") else {}
+        agreed = [f for f in failed
+                  if f["id"] in sol_out and outputs_match(sol_out[f["id"]], f["got"], spec.comparison)]
+        if len(agreed) != len(failed):
+            return []
+        for f in agreed:
+            by_id[f["id"]].update(expected=f["got"], label=by_id[f["id"]]["label"] + " (corrected)")
+        return [f["id"] for f in agreed]
 
     async def verify_and_debug(self, spec: ProblemSpec, plan: TestPlan, solution: Solution,
                                cases: list[dict[str, Any]], oracle: Oracle) -> VerificationResult:

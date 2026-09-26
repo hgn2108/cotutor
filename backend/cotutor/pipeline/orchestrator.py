@@ -37,12 +37,12 @@ class KnownProblem:
     confirm the Analyst reconstructed the right problem before anything is taught.
     """
 
-    entry: str                           # function name, or class name for design problems
-    params: tuple[str, ...] | None = None  # None for design problems
+    entry: str                           # function name, or class name for design/codec problems
+    params: tuple[str, ...] | None = None  # None for class-based problems
 
     def matches(self, spec: ProblemSpec) -> bool:
         if self.params is None:
-            return spec.kind == "design" and spec.entry == self.entry
+            return spec.kind in ("design", "codec") and spec.entry == self.entry
         return spec.entry == self.entry and tuple(p.name for p in spec.params) == self.params
 
 
@@ -78,6 +78,11 @@ class Pipeline:
             await self.ctx.emit({"type": "error", "message": "Please describe a coding problem "
                                  "with clear inputs and outputs."})
             return {"verified": False, "error": "not_a_problem"}
+        if spec.unsupported_reason.strip():
+            await self.ctx.emit({"type": "error", "code": "unsupported", "message":
+                                 f"Cotutor can't verify this kind of problem yet: "
+                                 f"{spec.unsupported_reason.strip()}"})
+            return {"verified": False, "error": "unsupported"}
         if known and not known.matches(spec):
             await self.ctx.emit({"type": "error", "code": "unrecognized", "message":
                                  "Couldn't reconstruct this problem reliably from its name. Paste "
@@ -100,7 +105,7 @@ class Pipeline:
         explain_task: asyncio.Task | None = None
         try:
             cases = self.verifier.build_cases(spec, plan)
-            oracle = await self.verifier.validate_oracle(spec, plan, cases)
+            oracle = await self.verifier.validate_oracle(spec, plan, cases, solution)
             result = await self.verifier.verify_and_debug(spec, plan, solution, cases, oracle)
             solution = result.solution
 

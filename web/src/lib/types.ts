@@ -6,7 +6,7 @@ export interface Param { name: string; type: string }
 export interface ProblemSpec {
   is_solvable: boolean
   title: string
-  kind: 'function' | 'design'
+  kind: 'function' | 'design' | 'codec'
   summary: string
   entry: string
   params: Param[]

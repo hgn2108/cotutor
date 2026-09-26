@@ -56,6 +56,100 @@ class TreeNode:
         return f"TreeNode({self.val})"
 
 
+class Node:
+    """LeetCode's ``Node`` for graphs ``Node(val, neighbors)`` and random-pointer lists
+    ``Node(val, next, random)``; both constructor shapes work."""
+
+    def __init__(self, val=0, next=None, random=None, neighbors=None):  # noqa: A002
+        if isinstance(next, list) and neighbors is None:  # Node(val, [neighbors...])
+            next, neighbors = None, next
+        self.val, self.next, self.random = val, next, random
+        self.neighbors = neighbors if neighbors is not None else []
+
+    def __repr__(self):
+        return f"Node({self.val})"
+
+
+def build_cycle_list(value):
+    """``{"values": [3, 2, 0, -4], "pos": 1}``: the tail links back to index ``pos`` (-1: none)."""
+    nodes = [ListNode(v) for v in value.get("values", [])]
+    for a, b in zip(nodes, nodes[1:], strict=False):  # pairs of neighbours
+        a.next = b
+    pos = value.get("pos", -1)
+    if nodes and pos is not None and 0 <= pos < len(nodes):
+        nodes[-1].next = nodes[pos]
+    return nodes[0] if nodes else None
+
+
+def build_random_list(pairs):
+    """LeetCode's ``[[val, random_index or null], ...]``."""
+    nodes = [Node(v) for v, _ in pairs]
+    for i, (_, r) in enumerate(pairs):
+        if i + 1 < len(nodes):
+            nodes[i].next = nodes[i + 1]
+        nodes[i].random = nodes[r] if r is not None else None
+    return nodes[0] if nodes else None
+
+
+def random_list_to_pairs(head, limit=10_000):
+    nodes = []
+    while head is not None and len(nodes) < limit:
+        nodes.append(head)
+        head = head.next
+    index = {id(n): i for i, n in enumerate(nodes)}
+    return [[n.val, index.get(id(n.random)) if n.random is not None else None] for n in nodes]
+
+
+def build_graph(adjacency):
+    """LeetCode's 1-indexed adjacency list: node ``i + 1`` connects to ``adjacency[i]``."""
+    if not adjacency:
+        return None
+    nodes = {i + 1: Node(i + 1) for i in range(len(adjacency))}
+    for i, neighbors in enumerate(adjacency):
+        nodes[i + 1].neighbors = [nodes[j] for j in neighbors]
+    return nodes[1]
+
+
+def graph_to_adjacency(node):
+    if node is None:
+        return []
+    seen, queue = {node.val: node}, collections.deque([node])
+    while queue:
+        for nb in queue.popleft().neighbors:
+            if nb.val not in seen:
+                seen[nb.val] = nb
+                queue.append(nb)
+    return [sorted(nb.val for nb in seen[v].neighbors) for v in range(1, max(seen) + 1) if v in seen]
+
+
+def reachable_nodes(values):
+    """ids of every node object reachable from the given arguments (for deep-copy checks)."""
+    seen, stack = set(), [v for v in values if isinstance(v, (Node, ListNode, TreeNode))]
+    while stack:
+        n = stack.pop()
+        if n is None or id(n) in seen:
+            continue
+        seen.add(id(n))
+        for attr in ("next", "random", "left", "right"):
+            nxt = getattr(n, attr, None)
+            if nxt is not None:
+                stack.append(nxt)
+        stack.extend(getattr(n, "neighbors", None) or [])
+    return seen
+
+
+def find_tree_node(root, val):
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n is None:
+            continue
+        if n.val == val:
+            return n
+        stack += [n.left, n.right]
+    return None
+
+
 def build_list(values):
     head = None
     for v in reversed(values or []):
@@ -124,7 +218,8 @@ PRELUDE = (
 
 
 def load_namespace(code, filename=SOLUTION_FILE):
-    ns = {"__name__": "solution", "ListNode": ListNode, "TreeNode": TreeNode}
+    ns = {"__name__": "solution", "ListNode": ListNode, "TreeNode": TreeNode, "Node": Node,
+          "GraphNode": Node, "RandomNode": Node}
     exec(compile(PRELUDE, "<prelude>", "exec"), ns)
     exec(compile(code, filename, "exec"), ns)
     return ns
@@ -142,6 +237,10 @@ def resolve_callable(ns, entry):
 
 def _kind(type_str):
     t = (type_str or "").replace(" ", "")
+    if "GraphNode" in t:
+        return "graph"
+    if "RandomNode" in t:
+        return "random_list"
     if "ListNode" in t:
         return "list_of_lists_nodes" if t.startswith(("List[", "list[")) else "listnode"
     if "TreeNode" in t:
@@ -150,17 +249,26 @@ def _kind(type_str):
 
 
 def convert_args(args, params):
-    out = []
+    out, first_tree = [], None
     for i, value in enumerate(args):
         kind = _kind(params[i].get("type") if i < len(params) else "")
-        if isinstance(value, (ListNode, TreeNode)) or value is None:
+        if isinstance(value, (ListNode, TreeNode, Node)) or value is None:
             out.append(value)  # generators sometimes build nodes themselves
+        elif kind == "graph":
+            out.append(build_graph(value))
+        elif kind == "random_list":
+            out.append(build_random_list(value))
+        elif kind == "listnode" and isinstance(value, dict):
+            out.append(build_cycle_list(value))
+        elif kind == "treenode" and isinstance(value, (int, float, str)) and first_tree is not None:
+            out.append(find_tree_node(first_tree, value))  # e.g. LCA: p and q given by value
         elif kind == "listnode":
             out.append(build_list(value))
         elif kind == "list_of_lists_nodes":
             out.append([build_list(v) for v in value])
         elif kind == "treenode":
             out.append(build_tree(value))
+            first_tree = first_tree or out[-1]
         else:
             out.append(value)
     return out
@@ -174,6 +282,8 @@ def to_plain(value, depth=0):
         return list_to_values(value)
     if isinstance(value, TreeNode):
         return tree_to_values(value)
+    if isinstance(value, Node):
+        return value.val
     if isinstance(value, bool) or value is None or isinstance(value, (int, str)):
         return value
     if isinstance(value, float):
@@ -242,6 +352,21 @@ def run_design(cls, ops, op_args):
     return out
 
 
+CODEC_METHODS = (("encode", "decode"), ("serialize", "deserialize"))
+
+
+def run_codec(cls, value):
+    """Round trip for encode/decode problems: the output must equal the input."""
+    obj = cls()
+    for enc, dec in CODEC_METHODS:
+        if hasattr(obj, enc) and hasattr(obj, dec):
+            data = getattr(obj, enc)(value)
+            if not isinstance(data, str):
+                raise TypeError(f"{enc}() must return a string, got {type(data).__name__}")
+            return getattr(obj, dec)(data)
+    raise NameError("Codec needs encode/decode or serialize/deserialize methods")
+
+
 class Runner:
     """How to call a solution, whatever its shape.
 
@@ -256,22 +381,34 @@ class Runner:
         self.in_place = spec.get("in_place_arg")
         self.return_type = spec.get("return_type", "")
         self.design = spec.get("kind") == "design"
+        self.codec = spec.get("kind") == "codec"
+        self._inputs = set()
 
     def prepare(self, args):
         """Fresh, converted arguments (callers may mutate them)."""
         args = copy.deepcopy(args)
-        return args if self.design else convert_args(args, self.params)
+        prepared = args if self.design else convert_args(args, self.params)
+        if _kind(self.return_type) in ("graph", "random_list"):
+            self._inputs = reachable_nodes(prepared)
+        return prepared
 
     def invoke(self, prepared):
         if self.design:
             return run_design(self.fn, *prepared)
+        if self.codec:
+            return run_codec(self.fn, prepared[0])
         return self.fn(*prepared)
 
     def output(self, prepared, raw):
-        """Plain JSON-able result, honouring in-place problems and empty lists/trees."""
-        if not self.design and self.in_place is not None and self.in_place >= 0:
+        """Plain JSON-able result, honouring in-place problems, node structures and copies."""
+        if not (self.design or self.codec) and self.in_place is not None and self.in_place >= 0:
             raw = prepared[self.in_place]
-        if raw is None and _kind(self.return_type) in ("listnode", "treenode"):
+        kind = _kind(self.return_type)
+        if kind in ("graph", "random_list") and raw is not None:
+            if reachable_nodes([raw]) & self._inputs:  # "clone"/"copy" must not reuse input nodes
+                return {"error": "returned the original nodes instead of a deep copy"}
+            return graph_to_adjacency(raw) if kind == "graph" else random_list_to_pairs(raw)
+        if raw is None and kind in ("listnode", "treenode", "graph", "random_list"):
             raw = []  # an empty list/tree is None at runtime and [] in LeetCode's JSON
         return to_plain(raw)
 

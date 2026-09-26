@@ -196,3 +196,106 @@ def test_design_trace_shows_object_fields_and_counts_work():
     counts = run({"kind": "line_counts", "spec": LRU_SPEC, "code": LRU, "generator_code": LRU_GEN,
                   "sizes": [8, 16, 32]})
     assert counts["ok"] and len(counts["runs"]) == 3
+
+
+def spec_of(entry, params, ret="", kind="function"):
+    return {"entry": entry, "kind": kind, "comparison": "exact", "return_type": ret,
+            "params": [{"name": n, "type": t} for n, t in params]}
+
+
+CLONE = """
+def cloneGraph(node):
+    if not node:
+        return None
+    copies = {}
+    def copy(n):
+        if n not in copies:
+            copies[n] = Node(n.val)
+            copies[n].neighbors = [copy(m) for m in n.neighbors]
+        return copies[n]
+    return copy(node)
+"""
+
+
+def test_clone_graph_requires_a_real_deep_copy():
+    spec = spec_of("cloneGraph", [("node", "Optional[GraphNode]")], "Optional[GraphNode]")
+    cases = [{"id": "a", "args": [[[2, 4], [1, 3], [2, 4], [1, 3]]], "expected": [[2, 4], [1, 3], [2, 4], [1, 3]]},
+             {"id": "empty", "args": [[]], "expected": []}]
+    ok = run({"kind": "tests", "spec": spec, "code": CLONE, "cases": cases})
+    assert [c["status"] for c in ok["cases"]] == ["pass", "pass"]
+    cheat = run({"kind": "tests", "spec": spec, "code": "def cloneGraph(node):\n    return node\n", "cases": cases[:1]})
+    assert cheat["cases"][0]["status"] == "fail"
+    assert "deep copy" in str(cheat["cases"][0]["got"])
+
+
+def test_copy_random_list_round_trips_pointers():
+    spec = spec_of("copyRandomList", [("head", "Optional[RandomNode]")], "Optional[RandomNode]")
+    code = """
+def copyRandomList(head):
+    copies, n = {None: None}, head
+    while n:
+        copies[n] = Node(n.val)
+        n = n.next
+    n = head
+    while n:
+        copies[n].next, copies[n].random = copies[n.next], copies[n.random]
+        n = n.next
+    return copies[head]
+"""
+    pairs = [[7, None], [13, 0], [11, 4], [10, 2], [1, 0]]
+    res = run({"kind": "tests", "spec": spec, "code": code, "cases": [{"id": "a", "args": [pairs], "expected": pairs}]})
+    assert res["cases"][0]["status"] == "pass"
+
+
+def test_cyclic_lists_and_node_references():
+    cyc = spec_of("hasCycle", [("head", "Optional[ListNode]")], "bool")
+    code = ("def hasCycle(head):\n    slow = fast = head\n    while fast and fast.next:\n"
+            "        slow, fast = slow.next, fast.next.next\n        if slow is fast:\n"
+            "            return True\n    return False\n")
+    res = run({"kind": "tests", "spec": cyc, "code": code, "cases": [
+        {"id": "loop", "args": [{"values": [3, 2, 0, -4], "pos": 1}], "expected": True},
+        {"id": "none", "args": [{"values": [1, 2], "pos": -1}], "expected": False}]})
+    assert [c["status"] for c in res["cases"]] == ["pass", "pass"]
+
+    lca = spec_of("lowestCommonAncestor", [("root", "TreeNode"), ("p", "TreeNode"), ("q", "TreeNode")], "TreeNode")
+    code = ("def lowestCommonAncestor(root, p, q):\n    while root:\n"
+            "        if p.val < root.val and q.val < root.val: root = root.left\n"
+            "        elif p.val > root.val and q.val > root.val: root = root.right\n"
+            "        else: return root\n")
+    tree = [6, 2, 8, 0, 4, 7, 9, None, None, 3, 5]
+    res = run({"kind": "tests", "spec": lca, "code": code, "cases": [
+        {"id": "a", "args": [tree, 2, 8], "expected": tree},
+        {"id": "b", "args": [tree, 2, 4], "expected": [2, 0, 4, None, None, 3, 5]}]})
+    assert [c["status"] for c in res["cases"]] == ["pass", "pass"]
+
+
+def test_codecs_round_trip_and_must_produce_strings():
+    spec = spec_of("Codec", [("root", "Optional[TreeNode]")], "Optional[TreeNode]", kind="codec")
+    good = """
+class Codec:
+    def serialize(self, root):
+        out = []
+        def go(n):
+            if not n:
+                out.append("#"); return
+            out.append(str(n.val)); go(n.left); go(n.right)
+        go(root)
+        return ",".join(out)
+
+    def deserialize(self, data):
+        vals = iter(data.split(","))
+        def go():
+            v = next(vals)
+            if v == "#":
+                return None
+            n = TreeNode(int(v)); n.left = go(); n.right = go()
+            return n
+        return go()
+"""
+    tree = [1, 2, 3, None, None, 4, 5]
+    res = run({"kind": "tests", "spec": spec, "code": good, "cases": [
+        {"id": "a", "args": [tree], "expected": tree}, {"id": "empty", "args": [[]], "expected": []}]})
+    assert [c["status"] for c in res["cases"]] == ["pass", "pass"]
+    lazy = "class Codec:\n    def serialize(self, root):\n        return root\n    def deserialize(self, data):\n        return data\n"
+    res = run({"kind": "tests", "spec": spec, "code": lazy, "cases": [{"id": "a", "args": [tree], "expected": tree}]})
+    assert res["cases"][0]["status"] == "error" and "must return a string" in res["cases"][0]["error"]["message"]
