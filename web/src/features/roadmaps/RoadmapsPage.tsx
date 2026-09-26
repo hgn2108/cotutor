@@ -1,8 +1,9 @@
 import clsx from 'clsx'
-import { Check, ChevronDown, Clock, Download, ExternalLink, Eye, Lock, Play, RotateCcw, Search, Upload, X, Zap } from 'lucide-react'
+import { Check, ChevronDown, Clock, Download, ExternalLink, Eye, EyeOff, Lock, Play, RotateCcw, Search, Upload, X, Zap } from 'lucide-react'
 import { type ReactNode, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, difficultyTone, Spinner } from '../../components/ui'
 import { type LearnMode, MODE_HELP, ModeToggle } from '../../components/ModeToggle'
+import { usePref } from '../../lib/prefs'
 import { downloadProgress, type ItemStatus, lastAttempted, parseProgress, type Progress, statusOf } from '../../lib/progress'
 import { type RoadmapId, type RoadmapProblem, roadmapProblems, type Roadmaps, supported } from '../../lib/roadmaps'
 
@@ -24,6 +25,8 @@ const FILTERS: [Filter, string][] = [['all', 'All'], ['new', 'Not started'], ['s
 export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, importProgress, onStart, mode, setMode }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [instantOnly, setInstantOnly] = useState(false)
+  // Category names give the pattern away; hiding them makes each lesson's pattern quiz a real test.
+  const [hidePatterns, setHidePatterns] = usePref('cotutor.hidePatterns', '')
   const [difficulty, setDifficulty] = useState<'all' | RoadmapProblem['difficulty']>('all')
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -133,6 +136,11 @@ export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, impor
           className={clsx('flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs', instantOnly ? 'bg-accent-soft text-accent' : 'bg-sunken text-muted')}>
           <Zap className="size-3" />Instant only
         </button>
+        <button onClick={() => setHidePatterns(hidePatterns ? '' : '1')} aria-pressed={!!hidePatterns}
+          title="Practice without knowing the pattern in advance: one list by problem number, no category names"
+          className={clsx('flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs', hidePatterns ? 'bg-accent-soft text-accent' : 'bg-sunken text-muted')}>
+          <EyeOff className="size-3" />Hide patterns
+        </button>
         <label className="flex w-full items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-xs focus-within:border-accent sm:ml-auto sm:w-auto">
           <Search className="size-3.5 text-faint" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search title or number" className="min-w-0 flex-1 bg-transparent sm:w-44 sm:flex-none outline-none placeholder:text-faint" />
@@ -140,7 +148,17 @@ export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, impor
       </div>
 
       <div className="mt-4 grid gap-3">
-        {data.categories.map((cat) => {
+        {hidePatterns && visible.length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 text-[13px] text-muted">
+              <EyeOff className="size-3.5" />Patterns hidden: work out each problem’s technique yourself in step 2.
+            </div>
+            <ul className="border-t border-line">
+              {[...visible].sort((a, b) => a.number - b.number).map((p) => <Row key={p.id} p={p} status={status(p)} onStart={onStart} />)}
+            </ul>
+          </Card>
+        )}
+        {!hidePatterns && data.categories.map((cat) => {
           const all = problems.filter((p) => p.category === cat)
           const rows = visible.filter((p) => p.category === cat)
           if (!all.length || !rows.length) return null

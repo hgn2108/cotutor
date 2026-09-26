@@ -6,7 +6,7 @@ import { useLesson } from '../context'
 import { Callout, ContinueBar, Prose, ThinkFirst } from '../parts'
 
 export function BruteForceChapter() {
-  const { state } = useLesson()
+  const { state, isDone } = useLesson()
   const intro = state.lessonIntro!
   const [revealed, setRevealed] = useState(false)
   return (
@@ -14,7 +14,7 @@ export function BruteForceChapter() {
       <ThinkFirst
         prompt="Forget efficiency. What's the most direct way to get the right answer?"
         placeholder="e.g. check every possible…" revealLabel="Show the brute force"
-        revealed={revealed} onReveal={() => setRevealed(true)}
+        revealed={revealed || isDone('brute')} onReveal={() => setRevealed(true)}
       >
         <Prose>{intro.brute_force_idea}</Prose>
         <div className="mt-3"><CodeView code={intro.brute_force_code} maxHeight={360} /></div>

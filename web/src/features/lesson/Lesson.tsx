@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { BadgeCheck, Check, ChevronRight, CircleSlash, Lock, ShieldAlert } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '../../components/ui'
+import { clearLesson, loadLesson, saveLesson } from '../../lib/lessonStore'
 import type { RunState } from '../../lib/useRun'
 import { BottleneckChapter } from './chapters/BottleneckChapter'
 import { BruteForceChapter } from './chapters/BruteForceChapter'
@@ -44,12 +45,14 @@ interface Props {
   onUnderTheHood: () => void
   roadmap?: RoadmapLink
   onComplete?: (score: number | null, mode: 'guided' | 'walkthrough') => void
-  onDirty?: (dirty: boolean) => void
+  /** Where this lesson's progress is saved; empty to not save it. */
+  storageKey: string
 }
 
-export function Lesson({ state, guided, dark, visible, onPractice, onUnderTheHood, roadmap, onComplete, onDirty }: Props) {
-  const [done, setDone] = useState<Set<ChapterId>>(new Set())
-  const [scores, setScores] = useState<Partial<Record<ChapterId, Score>>>({})
+export function Lesson({ state, guided, dark, visible, onPractice, onUnderTheHood, roadmap, onComplete, storageKey }: Props) {
+  const saved = useMemo(() => (storageKey ? loadLesson(storageKey) : null), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const [done, setDone] = useState<Set<ChapterId>>(() => new Set(saved?.done))
+  const [scores, setScores] = useState<Partial<Record<ChapterId, Score>>>(saved?.scores ?? {})
   const refs = useRef<Partial<Record<ChapterId, HTMLElement | null>>>({})
   const lastCompleted = useRef<ChapterId | null>(null)
 
@@ -73,7 +76,12 @@ export function Lesson({ state, guided, dark, visible, onPractice, onUnderTheHoo
     finish(t.n ? t.c / t.n : 0)
   }, [done, scores, guided, finished, finish])
 
-  useEffect(() => { onDirty?.(guided && done.size > 0 && !finished) }, [guided, done, finished, onDirty])
+  useEffect(() => {
+    if (!storageKey) return
+    // Once finished, the next visit (e.g. a review) should start from scratch.
+    if (finished) clearLesson(storageKey)
+    else saveLesson(storageKey, { done: [...done], scores, finished })
+  }, [storageKey, done, scores, finished])
 
   const ctx: LessonCtx = useMemo(() => ({
     state, guided, dark, visible, onPractice, scores, record, complete, isDone: (id) => done.has(id), roadmap, finish, finished,

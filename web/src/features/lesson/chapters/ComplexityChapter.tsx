@@ -83,7 +83,7 @@ export function ComplexityChapter() {
 
   return (
     <div>
-      {guided && correct && (
+      {guided && correct && (pick !== null || !isDone('complexity')) && (
         <div className="mb-4">
           <Prose className="mb-2.5 font-medium">Before the explanation: what's the time complexity of the optimized solution{design ? ', per operation' : ''}?</Prose>
           <div className="flex flex-wrap gap-2">

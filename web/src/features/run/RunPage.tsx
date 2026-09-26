@@ -23,7 +23,7 @@ interface Props {
   onBrowse: () => void
   roadmap?: RoadmapLink
   onComplete?: (score: number | null, mode: 'guided' | 'walkthrough') => void
-  onDirty?: (dirty: boolean) => void
+  lessonKey: string
 }
 
 /** Turn a failure into something a learner can act on. The raw detail stays under the hood. */
@@ -125,7 +125,7 @@ export function RunPage(p: Props) {
       <div className={view === 'lesson' ? '' : 'hidden'}>
         <Lesson key={runId} state={state} guided={guided} dark={dark} visible={view === 'lesson'}
           onPractice={p.onPractice} onUnderTheHood={() => switchTo('hood')} roadmap={roadmap}
-          onComplete={p.onComplete} onDirty={p.onDirty} />
+          onComplete={p.onComplete} storageKey={p.lessonKey} />
       </div>
       {view === 'hood' && <UnderTheHood state={state} dark={dark} onRegenerate={running ? undefined : regenerate} />}
     </main>

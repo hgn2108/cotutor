@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import cache
 from typing import Any
 
 from fastapi import FastAPI, WebSocket
@@ -34,7 +35,16 @@ def health() -> dict[str, Any]:
 
 @app.get("/api/problems")
 def problems() -> list[dict[str, Any]]:
-    return library.problems()
+    """The home-page library, tagged with the same pattern names its lesson uses."""
+    return [p | {"tags": _lesson_tags(p["statement"]) or p["tags"]} for p in library.problems()]
+
+
+@cache
+def _lesson_tags(statement: str) -> list[str] | None:
+    record = deps.cache.get(statement)
+    events = record.get("events", []) if record else []
+    spec = next((e["data"] for e in events if e.get("type") == "artifact" and e.get("name") == "spec"), None)
+    return spec.get("pattern_tags") if spec else None
 
 
 @app.get("/api/roadmaps")

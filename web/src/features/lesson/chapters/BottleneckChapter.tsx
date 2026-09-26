@@ -7,7 +7,7 @@ import { SizePicker, useLineHeat } from '../lineHeat'
 import { Callout, ContinueBar, Prose } from '../parts'
 
 export function BottleneckChapter() {
-  const { state, guided, record } = useLesson()
+  const { state, guided, record, isDone } = useLesson()
   const intro = state.lessonIntro!
   const target = intro.bottleneck_line
   const [wrong, setWrong] = useState<number[]>([])
@@ -16,7 +16,7 @@ export function BottleneckChapter() {
   const [askedHint, setAskedHint] = useState(false)
   const [revealed, setRevealed] = useState(false)
   const [n, setN] = useState<number | null>(null)
-  const open = !guided || solved !== null || revealed || target === null
+  const open = !guided || solved !== null || revealed || target === null || isDone('bottleneck')
   const brute = state.lineCounts?.brute_force
   const { run, heat, gutter } = useLineHeat(brute, n)
   // Lines in the same hot loop that run at least as often as the answer are also accepted.

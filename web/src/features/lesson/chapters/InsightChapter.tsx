@@ -7,7 +7,7 @@ import { useLesson } from '../context'
 import { Callout, ContinueBar, ThinkFirst } from '../parts'
 
 export function InsightChapter() {
-  const { state, dark } = useLesson()
+  const { state, dark, isDone } = useLesson()
   const solution = state.solutions.at(-1)!
   const ex = state.explanation
   const [revealed, setRevealed] = useState(false)
@@ -17,7 +17,7 @@ export function InsightChapter() {
       <ThinkFirst
         prompt="You know where the wasted work is. How could you avoid repeating it?"
         placeholder="e.g. remember something so you don't have to search again…" revealLabel="Show the key insight"
-        revealed={revealed} onReveal={() => setRevealed(true)}
+        revealed={revealed || isDone('insight')} onReveal={() => setRevealed(true)}
       >
         <Callout icon={<Lightbulb className="size-4" />} title={solution.approach}>
           {state.lessonDeep?.insight ?? solution.key_insight}

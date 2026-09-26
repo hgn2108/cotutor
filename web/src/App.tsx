@@ -5,6 +5,7 @@ import { Home } from './features/home/Home'
 import type { RoadmapLink } from './features/lesson/context'
 import { RoadmapsPage } from './features/roadmaps/RoadmapsPage'
 import { RunPage } from './features/run/RunPage'
+import { clearLesson } from './lib/lessonStore'
 import { useLibrary } from './lib/library'
 import { usePref, useTheme } from './lib/prefs'
 import { useProgress } from './lib/progress'
@@ -13,8 +14,6 @@ import { type LessonRoute, lessonPath, parseLesson, useHashRoute } from './lib/r
 import type { LibraryProblem } from './lib/types'
 import { useRun } from './lib/useRun'
 import { sandbox, type SandboxStatus } from './sandbox/sandbox'
-
-const LEAVE_WARNING = 'Leave this lesson? Your answers so far will be lost.'
 
 export default function App() {
   const { theme, setTheme, dark } = useTheme()
@@ -37,20 +36,15 @@ export default function App() {
 
   // The URL of the lesson currently loaded, so Back/Forward/refresh can tell when it changed.
   const loadedPath = useRef<string | null>(null)
-  // True while a guided lesson has answers that leaving would throw away.
-  const dirty = useRef(false)
-  const confirmLeave = useCallback(() => !dirty.current || window.confirm(LEAVE_WARNING), [])
-
-  useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => { if (dirty.current) e.preventDefault() }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [])
+  // Where the loaded lesson's progress is saved (see lessonStore), so returning to it resumes.
+  const [lessonKey, setLessonKey] = useState('')
 
   const run = useCallback((route: LessonRoute, problem: string, opts: { fresh?: boolean; ref?: string } = {}) => {
     const to = lessonPath(route)
+    const key = route.kind === 'custom' ? `custom:${problem.trim()}` : to
+    if (opts.fresh) clearLesson(key) // a regenerated lesson has new questions
     loadedPath.current = to
-    dirty.current = false
+    setLessonKey(key)
     setRunId((n) => n + 1) // remounts the lesson so progress starts fresh
     window.scrollTo({ top: 0 })
     navigate(to)
@@ -77,7 +71,6 @@ export default function App() {
       if (state.status === 'running') cancel()
       if (state.status !== 'idle') reset()
       loadedPath.current = null
-      dirty.current = false
       return
     }
     if (loadedPath.current === path) return
@@ -108,23 +101,18 @@ export default function App() {
   }, [path, roadmaps.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const goRoadmap = useCallback((id: RoadmapId) => {
-    if (!confirmLeave()) return
     setLastRoadmap(id)
     navigate(`/roadmaps/${id}`)
-  }, [navigate, setLastRoadmap, confirmLeave])
+  }, [navigate, setLastRoadmap])
 
-  const goHome = useCallback(() => {
-    if (!confirmLeave()) return
-    navigate('/')
-  }, [navigate, confirmLeave])
+  const goHome = useCallback(() => navigate('/'), [navigate])
 
   /** Open a suggested problem: from the roadmap when we know it (instant if recorded), else a fresh run. */
   const practice = useCallback((title: string) => {
-    if (!confirmLeave()) return
     const item = roadmaps.data && findByTitle(roadmaps.data, title)
     if (item) startRoadmap(item, origin?.roadmap ?? (item.roadmaps.includes(lastRoadmap) ? lastRoadmap : item.roadmaps[0]))
     else startCustom(`LeetCode problem: ${title}`)
-  }, [roadmaps.data, origin, lastRoadmap, startRoadmap, startCustom, confirmLeave])
+  }, [roadmaps.data, origin, lastRoadmap, startRoadmap, startCustom])
 
   const roadmapLink: RoadmapLink | undefined = useMemo(() => {
     if (!origin) return undefined
@@ -133,12 +121,11 @@ export default function App() {
       title: origin.item.title,
       url: origin.item.url,
       back: () => goRoadmap(origin.roadmap),
-      next: next && { title: next.title, start: () => { if (confirmLeave()) startRoadmap(next, origin.roadmap) } },
+      next: next && { title: next.title, start: () => startRoadmap(next, origin.roadmap) },
     }
-  }, [origin, roadmaps.data, goRoadmap, startRoadmap, confirmLeave])
+  }, [origin, roadmaps.data, goRoadmap, startRoadmap])
 
   const onComplete = useCallback((score: number | null, lessonMode: 'guided' | 'walkthrough') => {
-    dirty.current = false
     if (origin) record(origin.item.id, score, lessonMode)
   }, [origin, record])
 
@@ -166,7 +153,7 @@ export default function App() {
         onRetry={retry} onRegenerate={regenerate} onCancel={cancel}
         onBack={origin ? () => goRoadmap(origin.roadmap) : goHome}
         onBrowse={() => goRoadmap(origin?.roadmap ?? currentRoadmap)}
-        roadmap={roadmapLink} onComplete={onComplete} onDirty={(d) => { dirty.current = d }}
+        roadmap={roadmapLink} onComplete={onComplete} lessonKey={lessonKey}
       />
     )
   } else if (roadmapRoute) {
