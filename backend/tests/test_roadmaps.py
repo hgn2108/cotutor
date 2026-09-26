@@ -85,4 +85,4 @@ def test_roadmaps_endpoint_marks_recorded_lessons():
     probs = {p["id"]: p for p in TestClient(app).get("/api/roadmaps").json()["problems"]}
     assert probs["two-sum"]["recorded"] is True           # library recording reused
     assert probs["koko-eating-bananas"]["recorded"] is True  # recorded from its name
-    assert probs["lru-cache"]["recorded"] is False
+    assert probs["clone-graph"]["recorded"] is False  # special structure: never recorded
