@@ -42,6 +42,7 @@ def drive_session(ws, message):
 
 
 def test_http_endpoints(client):
+    assert client.get("/").json()["health"] == "/api/health"
     assert client.get("/api/health").json()["ok"] is True
     assert len(client.get("/api/problems").json()) >= 10
     assert "def run_job" in client.get("/api/harness.py").text

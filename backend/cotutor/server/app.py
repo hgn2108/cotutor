@@ -20,6 +20,13 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins,
                    allow_methods=["GET"], allow_headers=["*"])
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    """This is the API; the app itself is the frontend (see the README)."""
+    return {"service": "cotutor-api", "health": "/api/health",
+            "source": "https://github.com/hgn2108/cotutor"}
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     return {"ok": True, "features": deps.features()}
