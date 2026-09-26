@@ -23,9 +23,9 @@ const toneClass: Record<Tone, string> = {
   bad: 'bg-bad-soft text-bad border-transparent',
 }
 
-export function Badge({ tone = 'neutral', children, className, title }: { tone?: Tone; children: ReactNode; className?: string; title?: string }) {
+export function Badge({ tone = 'neutral', children, className, title, wrap = false }: { tone?: Tone; children: ReactNode; className?: string; title?: string; wrap?: boolean }) {
   return (
-    <span title={title} className={clsx('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-4 whitespace-nowrap', toneClass[tone], className)}>
+    <span title={title} className={clsx('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-4', wrap ? 'max-w-full break-words' : 'whitespace-nowrap', toneClass[tone], className)}>
       {children}
     </span>
   )
@@ -58,6 +58,16 @@ export function Waiting({ label }: { label: string }) {
 
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {
   return <code className={clsx('font-mono text-[12.5px]', className)}>{children}</code>
+}
+
+/** Copy to the clipboard; resolves false when the browser refuses (no permission, insecure page). */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function formatJson(v: unknown, max = 160): string {

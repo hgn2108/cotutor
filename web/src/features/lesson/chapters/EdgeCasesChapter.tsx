@@ -8,6 +8,13 @@ import { ArgsInline, ContinueBar, Prose } from '../parts'
 
 interface EdgeItem { def: CaseDef; result: CaseResult }
 
+/** Agent ids like `tricky_equal_hours` read as "Tricky equal hours". */
+function humanize(label: string): string {
+  if (!/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(label)) return label
+  const s = label.replace(/_/g, ' ')
+  return s[0].toUpperCase() + s.slice(1)
+}
+
 function pickEdgeCases(defs: CaseDef[], results: CaseResult[], design: boolean): EdgeItem[] {
   const byId = new Map(results.map((r) => [r.id, r]))
   const usable = defs
@@ -15,7 +22,10 @@ function pickEdgeCases(defs: CaseDef[], results: CaseResult[], design: boolean):
     .filter((x) => x.result && x.result.expected_source !== 'none' && x.def.source !== 'stress' && x.def.category !== 'large'
       && JSON.stringify(x.def.args).length < (design ? 220 : 90))
   const rank = (x: EdgeItem) => (x.def.category === 'tricky' ? 0 : x.def.category === 'edge' ? 1 : 2)
-  return usable.sort((a, b) => rank(a) - rank(b)).slice(0, 4)
+  // Prefer inputs the learner hasn't already seen as examples in step 1.
+  const fresh = usable.filter((x) => x.def.source !== 'example')
+  const pool = fresh.length >= 3 ? fresh : usable
+  return pool.sort((a, b) => rank(a) - rank(b)).slice(0, 4)
 }
 
 function EdgeCase({ item, index, onResult }: { item: EdgeItem; index: number; onResult: (correct: boolean | null) => void }) {
@@ -36,7 +46,7 @@ function EdgeCase({ item, index, onResult }: { item: EdgeItem; index: number; on
     <div className="rounded-xl border border-line bg-panel p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[12px] font-semibold text-faint">#{index + 1}</span>
-        <span className="text-[13.5px] font-medium">{item.def.label}</span>
+        <span className="text-[13.5px] font-medium">{humanize(item.def.label)}</span>
         {item.def.category && <Badge>{item.def.category}</Badge>}
       </div>
       <div className="mt-2"><ArgsInline args={item.def.args} spec={spec} /></div>
@@ -50,7 +60,7 @@ function EdgeCase({ item, index, onResult }: { item: EdgeItem; index: number; on
       ) : (
         <div className="mt-3 grid gap-1.5">
           {guided
-            ? <Verdict correct={outcome ?? null}>Expected <code className="font-mono">{formatJson(expected)}</code>{multi && outcome === false ? ' (other answers can also be valid here)' : ''}</Verdict>
+            ? <Verdict correct={outcome ?? null}>{outcome === false && <>You said <code className="font-mono">{guess.trim()}</code> · </>}Expected <code className="font-mono">{formatJson(expected)}</code>{multi && outcome === false ? ' (other answers can also be valid here)' : ''}</Verdict>
             : <div className="text-[13px]"><span className="text-muted">Output: </span><code className="font-mono font-semibold">{formatJson(expected)}</code></div>}
           {item.def.rationale && <p className="text-[12.5px] leading-relaxed text-muted">Why it matters: {item.def.rationale}</p>}
         </div>

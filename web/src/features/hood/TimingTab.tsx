@@ -78,7 +78,7 @@ export function TimingTab({ state }: { state: RunState }) {
   const c = state.complexity
   if (!c) {
     if (state.status === 'running') return <Waiting label="Timing the verified solution on growing inputs…" />
-    return <Card className="p-5 text-sm text-muted">No timing data for this run (the test designer did not provide an input generator).</Card>
+    return <Card className="p-5 text-sm text-muted">{state.status === 'error' ? 'No timing data: the run stopped before timing.' : 'No timing data for this run: there was no way to generate larger inputs.'}</Card>
   }
   const tone = c.verdict === 'consistent' ? 'ok' : c.verdict === 'inconclusive' ? 'neutral' : 'warn'
   return (

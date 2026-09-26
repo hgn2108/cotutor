@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import { Check, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, HelpCircle, Pause, Play, X } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
-import type { Explanation, Trace, TraceStep } from '../../lib/types'
+import type { Explanation, Json, ProblemSpec, Snap, Trace, TraceStep } from '../../lib/types'
 import { Badge, Button, Card, formatJson, Mono } from '../../components/ui'
 import { answersMatch, parseAnswer } from '../lesson/answers'
+import { ArgsInline } from '../lesson/parts'
 import { type Checkpoint, findCheckpoints } from './checkpoints'
 import { CodeView } from './CodeView'
 import { narrate } from './narrate'
@@ -15,6 +16,9 @@ const SPEEDS = [0.5, 1, 2, 4]
 interface Props {
   trace: Trace
   explanation?: Explanation
+  spec?: ProblemSpec
+  /** Whether the player is on screen; arrow keys only step it then. */
+  active?: boolean
   /** Guided mode pauses at checkpoints and asks the learner to predict what happens next. */
   guided?: boolean
   onProgress?: (p: { reachedEnd: boolean; answered: number; correct: number; total: number }) => void
@@ -22,7 +26,7 @@ interface Props {
 
 type Answer = { correct: boolean | null } // null = revealed without answering
 
-export function Player({ trace, explanation, guided = false, onProgress }: Props) {
+export function Player({ trace, explanation, spec, active = true, guided = false, onProgress }: Props) {
   const steps = trace.steps
   const [i, setI] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -39,7 +43,7 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
   const go = (next: number) => {
     const target = Math.max(0, Math.min(last, next))
     // In guided mode, stepping forward stops at the next unanswered checkpoint.
-    const gate = guided ? checkpoints.find((c) => c.step > i && c.step < target && !answers[c.step]) : undefined
+    const gate = guided ? checkpoints.find((c) => c.step >= i && c.step < target && !answers[c.step]) : undefined
     const to = gate ? gate.step : target
     setI(to)
     if (to === last) setReachedEnd(true)
@@ -58,6 +62,7 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
   }, [answers, reachedEnd, checkpoints.length, onProgress])
 
   useEffect(() => {
+    if (!active) return
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, textarea, .monaco-editor')) return
       if (e.key === 'ArrowRight') { setPlaying(false); if (!blocked) go(i + 1) }
@@ -66,6 +71,8 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  const allAnswered = checkpoints.every((c) => answers[c.step])
 
   if (!steps.length) return <Card className="p-5 text-sm text-muted">The trace is empty. {trace.error && `${trace.error.type}: ${trace.error.message}`}</Card>
   const step = steps[i]
@@ -87,7 +94,7 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
               {playing ? <Pause className="size-4" /> : <Play className="ml-0.5 size-4" />}
             </button>
             <IconBtn label="Next step" disabled={blocked} onClick={() => { setPlaying(false); go(i + 1) }}><ChevronRight className="size-4" /></IconBtn>
-            <IconBtn label="Last step" disabled={guided} onClick={() => { setPlaying(false); go(last) }}><ChevronLast className="size-4" /></IconBtn>
+            <IconBtn label="Last step" disabled={guided && !reachedEnd && !allAnswered} onClick={() => { setPlaying(false); go(last) }}><ChevronLast className="size-4" /></IconBtn>
           </div>
           <div className="relative min-w-[140px] flex-1">
             <input
@@ -113,6 +120,7 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
           <CheckpointCard
             key={checkpoint.step} checkpoint={checkpoint} step={step} trace={trace} answer={answers[checkpoint.step]}
             onAnswer={(a) => setAnswers((prevA) => ({ ...prevA, [checkpoint.step]: a }))}
+            isLast={i >= last} design={spec?.kind === 'design'}
             onContinue={() => { go(i + 1); setPlaying(true) }}
           />
         ) : (
@@ -124,16 +132,16 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
         )}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Card className="p-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Code</span>
             {stack.length > 1 && <Badge tone="accent">recursion depth {stack.length}</Badge>}
           </div>
           <CodeView code={trace.code} line={step.line} prevLine={prev?.line} event={step.event} />
-          <div className="mt-3 text-[12px] text-muted">
-            Input <Mono>{formatJson(trace.args, 120)}</Mono>
-            {(!guided || reachedEnd) && trace.result !== null && <> · returns <Mono>{formatJson(trace.result, 60)}</Mono></>}
+          <div className="mt-3 break-words text-[12px] text-muted">
+            Input <ArgsInline args={trace.args} spec={spec} />
+            {(!guided || reachedEnd) && trace.result !== null && <> · {spec?.kind === 'design' ? 'outputs' : 'returns'} <Mono>{formatJson(trace.result, 60)}</Mono></>}
           </div>
           {trace.truncated && <p className="mt-1 text-[11.5px] text-warn">Trace truncated at {steps.length} steps.</p>}
         </Card>
@@ -154,15 +162,22 @@ export function Player({ trace, explanation, guided = false, onProgress }: Props
   )
 }
 
-function CheckpointCard({ checkpoint, step, trace, answer, onAnswer, onContinue }: {
+/** A snapshot as plain JSON, for comparing against what the learner typed. */
+function snapJson(s: Snap | undefined): Json {
+  if (s === undefined || s === null || typeof s !== 'object') return (s ?? null) as Json
+  if ('values' in s && (s.t === 'list' || s.t === 'tuple' || s.t === 'deque')) return s.values.map(snapJson)
+  return show(s, 200)
+}
+
+function CheckpointCard({ checkpoint, step, trace, answer, onAnswer, onContinue, isLast, design }: {
   checkpoint: Checkpoint; step: TraceStep; trace: Trace; answer?: Answer
-  onAnswer: (a: Answer) => void; onContinue: () => void
+  onAnswer: (a: Answer) => void; onContinue: () => void; isLast: boolean; design: boolean
 }) {
   const [guess, setGuess] = useState('')
   if (checkpoint.kind === 'branch') {
     const names = Object.keys(step.locals).filter((n) => new RegExp(`\\b${n}\\b`).test(checkpoint.condition))
     const context = names.map((n) => `${n} = ${show(step.locals[n], 28)}`).join(', ')
-    const question = checkpoint.keyword === 'while' ? 'Will the loop body run again?' : 'Will this condition be true?'
+    const question = checkpoint.keyword === 'while' ? 'Will the loop body run this time?' : 'Will this condition be true?'
     return (
       <div className="mt-3 rounded-lg border border-viz-3/40 bg-warn-soft/40 p-3.5">
         <div className="flex items-start gap-2">
@@ -182,7 +197,7 @@ function CheckpointCard({ checkpoint, step, trace, answer, onAnswer, onContinue 
                 <Verdict correct={answer.correct}>
                   It's <b>{checkpoint.answer ? 'true' : 'false'}</b>{checkpoint.answer ? ', so execution enters the block.' : ', so execution skips the block.'}
                 </Verdict>
-                <Button onClick={onContinue} className="py-1.5">Continue <ChevronRight className="size-3.5" /></Button>
+                <Button onClick={onContinue} className="py-1.5">Resume <ChevronRight className="size-3.5" /></Button>
               </div>
             )}
           </div>
@@ -190,22 +205,25 @@ function CheckpointCard({ checkpoint, step, trace, answer, onAnswer, onContinue 
       </div>
     )
   }
+  // Design problems return per call: ask about the call that's finishing, not the whole sequence.
+  const expected: Json = design ? snapJson(step.ret) : trace.result
+  const question = design ? <>what does this <code className="font-mono">{step.func}()</code> call return?</> : 'what will the function return for this input?'
   return (
     <div className="mt-3 rounded-lg border border-viz-3/40 bg-warn-soft/40 p-3.5">
       <div className="flex items-start gap-2">
         <HelpCircle className="mt-0.5 size-4 shrink-0 text-warn" />
         <div className="min-w-0 flex-1">
-          <div className="text-[13.5px] font-medium">Predict: what will the function return for this input?</div>
+          <div className="text-[13.5px] font-medium">Predict: {question}</div>
           {!answer ? (
-            <form className="mt-2.5 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); const g = parseAnswer(guess); onAnswer({ correct: g.ok && answersMatch(g.value, trace.result, 'exact') }) }}>
+            <form className="mt-2.5 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); const g = parseAnswer(guess); onAnswer({ correct: g.ok && answersMatch(g.value, expected, 'exact') }) }}>
               <input value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="e.g. [1, 2]" className="w-44 rounded-lg border border-line bg-panel px-3 py-1.5 font-mono text-[13px] outline-none focus:border-accent" />
               <Button variant="outline" type="submit" disabled={!guess.trim()}>Check</Button>
               <Button variant="ghost" type="button" className="text-xs" onClick={() => onAnswer({ correct: null })}>Just show me</Button>
             </form>
           ) : (
             <div className="mt-2.5 flex flex-wrap items-center gap-3">
-              <Verdict correct={answer.correct}>It returns <Mono>{formatJson(trace.result, 60)}</Mono></Verdict>
-              <Button onClick={onContinue} className="py-1.5">See it <ChevronRight className="size-3.5" /></Button>
+              <Verdict correct={answer.correct}>It returns <Mono>{design ? show(step.ret ?? null, 60) : formatJson(trace.result, 60)}</Mono></Verdict>
+              {!isLast && <Button onClick={onContinue} className="py-1.5">Resume <ChevronRight className="size-3.5" /></Button>}
             </div>
           )}
         </div>

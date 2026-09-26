@@ -1,5 +1,6 @@
 import clsx from 'clsx'
-import { Code2, FlaskConical, Gauge } from 'lucide-react'
+import { Code2, FlaskConical, Gauge, RotateCw } from 'lucide-react'
+import { Button } from '../../components/ui'
 import { useState } from 'react'
 import type { RunState } from '../../lib/useRun'
 import { CodeTab } from './CodeTab'
@@ -15,7 +16,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 /** The engineering view: what the agents did, how the solution was verified, and at what cost. */
-export function UnderTheHood({ state, dark }: { state: RunState; dark: boolean }) {
+export function UnderTheHood({ state, dark, onRegenerate }: { state: RunState; dark: boolean; onRegenerate?: () => void }) {
   const [tab, setTab] = useState<TabId>('tests')
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -26,6 +27,14 @@ export function UnderTheHood({ state, dark }: { state: RunState; dark: boolean }
           <p className="mt-3 font-mono text-[10.5px] leading-4 text-faint">
             {state.summary.llm_calls} LLM calls · {(state.summary.input_tokens + state.summary.output_tokens).toLocaleString()} tokens · {(state.summary.ms / 1000).toFixed(1)}s
           </p>
+        )}
+        {onRegenerate && (
+          <div className="mt-5 rounded-xl border border-line p-3">
+            <p className="text-[12px] leading-4 text-muted">
+              {state.summary?.replayed ? 'This lesson was replayed from a saved, verified run.' : 'Want a different take on this problem?'}
+            </p>
+            <Button variant="outline" className="mt-2 text-xs" onClick={onRegenerate}><RotateCw className="size-3" />Regenerate with AI</Button>
+          </div>
         )}
       </aside>
       <section className="min-w-0">

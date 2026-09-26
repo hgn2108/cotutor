@@ -36,7 +36,7 @@ export function ProblemChapter() {
             {!state.byName && <><div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">In other words</div>
             <Prose className="whitespace-pre-line">{spec.summary}</Prose></>}
             {spec.constraints.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">{spec.constraints.map((c) => <Badge key={c} className="font-mono">{c}</Badge>)}</div>
+              <div className="mt-3 flex flex-wrap gap-1.5">{spec.constraints.map((c) => <Badge key={c} wrap className="font-mono">{c}</Badge>)}</div>
             )}
           </div>
           <div>

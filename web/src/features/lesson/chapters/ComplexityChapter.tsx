@@ -4,7 +4,7 @@ import { Badge, Card } from '../../../components/ui'
 import type { LineCountRun } from '../../../lib/types'
 import { CodeView } from '../../viz/CodeView'
 import { Verdict } from '../../viz/Player'
-import { bigOOptions, normalizeBigO } from '../answers'
+import { bigOOptions, normalizeBigO, prettyBigO } from '../answers'
 import { useLesson } from '../context'
 import { SizePicker, useLineHeat } from '../lineHeat'
 import { Callout, ContinueBar, Prose } from '../parts'
@@ -42,13 +42,16 @@ function StepGrowth({ solution, brute }: { solution: LineCountRun[]; brute?: Lin
       </svg>
       <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px]">
         {series.map((s) => {
-          const r = ratio(s.runs)
+          // A series that hit the step limit has no meaningful growth ratio.
+          const capped = s.runs.some((x) => x.capped)
+          const r = capped ? null : ratio(s.runs)
           return (
             <span key={s.name} className="flex items-center gap-1.5">
               <span className={clsx('h-0.5 w-4 rounded', s.cls.replace('stroke', 'bg'))} />
               <span className="text-muted">{s.name}:</span>
               <span className="font-mono">{s.runs.map((x) => `${x.capped ? '≥' : ''}${x.total.toLocaleString()}`).join(' → ')} steps</span>
               {r && <Badge tone={r > 3 ? 'warn' : 'ok'} className="font-mono">×{r.toFixed(1)} per doubling</Badge>}
+              {capped && <Badge tone="warn">grew past the step limit</Badge>}
             </span>
           )
         })}
@@ -62,6 +65,7 @@ export function ComplexityChapter() {
   const solution = state.solutions.at(-1)!
   const deep = state.lessonDeep!
   const correct = normalizeBigO(solution.time_complexity)
+  const design = state.spec?.kind === 'design'
   const [pick, setPick] = useState<string | null>(null)
   const [n, setN] = useState<number | null>(null)
   const open = !guided || !correct || pick !== null || isDone('complexity')
@@ -81,7 +85,7 @@ export function ComplexityChapter() {
     <div>
       {guided && correct && (
         <div className="mb-4">
-          <Prose className="mb-2.5 font-medium">Before the explanation: what's the time complexity of the optimized solution?</Prose>
+          <Prose className="mb-2.5 font-medium">Before the explanation: what's the time complexity of the optimized solution{design ? ', per operation' : ''}?</Prose>
           <div className="flex flex-wrap gap-2">
             {bigOOptions.map((o) => (
               <button key={o} onClick={() => choose(o)} disabled={!!pick}
@@ -92,7 +96,7 @@ export function ComplexityChapter() {
                   pick && o !== correct && pick !== o && 'border-line opacity-50')}>{o}</button>
             ))}
           </div>
-          {pick && <div className="mt-2"><Verdict correct={pick === correct}>It's <b>{solution.time_complexity}</b>. Here's why.</Verdict></div>}
+          {pick && <div className="mt-2"><Verdict correct={pick === correct}>It's <b>{prettyBigO(solution.time_complexity)}</b>. Here's why.</Verdict></div>}
         </div>
       )}
       {open && (
@@ -100,7 +104,11 @@ export function ComplexityChapter() {
           {counts && (
             <Card className="p-4">
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Count the steps, don't just trust the label</div>
-              <p className="mb-3 text-[13px] text-muted">Total lines executed on {counts.used_worst_case ? 'worst-case' : 'random'} inputs as n doubles. Doubling n and seeing about ×2 steps means linear growth; about ×4 means quadratic.</p>
+              <p className="mb-3 text-[13px] text-muted">
+                {design
+                  ? 'Here n is the number of operations. Total lines executed as n doubles: about ×2 total steps means each operation costs O(1) on average; more than that means operations get slower as the structure grows.'
+                  : `Total lines executed on ${counts.used_worst_case ? 'worst-case' : 'random'} inputs as n doubles. About ×2 steps means linear growth; about ×4 means quadratic.`}
+              </p>
               <StepGrowth solution={counts.solution} brute={counts.brute_force} />
             </Card>
           )}
@@ -120,8 +128,8 @@ export function ComplexityChapter() {
                   <div><span className="font-medium">{d.cost}</span><span className="text-muted">: {d.note}</span></div>
                 </div>
               ))}
-              <Callout tone="ok" title={`Time: ${solution.time_complexity}`}>{deep.time_summary}</Callout>
-              <Callout tone="accent" title={`Space: ${solution.space_complexity}`}>{deep.space_summary}</Callout>
+              <Callout tone="ok" title={`Time: ${prettyBigO(solution.time_complexity)}`}>{deep.time_summary}</Callout>
+              <Callout tone="accent" title={`Space: ${prettyBigO(solution.space_complexity)}`}>{deep.space_summary}</Callout>
               {state.complexity?.slope != null && (
                 <p className="text-[11.5px] text-faint">Also checked at scale: timing up to n = {state.complexity.points.at(-1)?.[0].toLocaleString()} grew about n^{state.complexity.slope.toFixed(2)} ({state.complexity.verdict.replaceAll('_', ' ')}). See Under the hood.</p>
               )}

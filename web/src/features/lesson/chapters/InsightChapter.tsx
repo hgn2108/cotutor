@@ -2,7 +2,7 @@ import { Editor } from '@monaco-editor/react'
 import { Check, Copy, Lightbulb } from 'lucide-react'
 import { useState } from 'react'
 import { Flowchart } from '../../../components/Flowchart'
-import { Badge, Button, Card } from '../../../components/ui'
+import { Badge, Button, Card, copyText } from '../../../components/ui'
 import { useLesson } from '../context'
 import { Callout, ContinueBar, ThinkFirst } from '../parts'
 
@@ -11,7 +11,7 @@ export function InsightChapter() {
   const solution = state.solutions.at(-1)!
   const ex = state.explanation
   const [revealed, setRevealed] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<boolean | null>(null)
   return (
     <div>
       <ThinkFirst
@@ -28,8 +28,8 @@ export function InsightChapter() {
             <div className="flex items-center gap-2 border-b border-line px-4 py-2">
               <span className="font-mono text-xs text-muted">solution.py</span>
               {state.summary?.verified && <Badge tone="ok">verified</Badge>}
-              <Button variant="ghost" className="ml-auto text-xs" onClick={async () => { await navigator.clipboard.writeText(solution.code); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>
-                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}{copied ? 'Copied' : 'Copy'}
+              <Button variant="ghost" className="ml-auto text-xs" onClick={async () => { setCopied(await copyText(solution.code)); setTimeout(() => setCopied(null), 1800) }}>
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}{copied ? 'Copied' : copied === false ? 'Copy failed: select the code instead' : 'Copy'}
               </Button>
             </div>
             <Editor

@@ -7,6 +7,24 @@ import { Spinner } from '../../components/ui'
 
 const PARALLEL = new Set(['design_tests', 'solve', 'complexity', 'explain'])
 
+// Plain-language labels (older recordings still carry the original wording).
+const LABELS: Record<string, string> = {
+  design_tests: 'Test Designer: edge cases + a slow reference solution',
+  oracle: 'Check the answer key: reference solution vs. examples',
+  naive_check: 'Confirm the slow version is really slow',
+}
+
+function plain(detail: string): string {
+  return detail
+    .replace(/brute-force oracle/gi, 'reference solution')
+    .replace(/\boracle-generated\b/gi, 'generated')
+    .replace(/\boracle\b/gi, 'reference solution')
+    .replace(/random stress trials/gi, 'random inputs')
+    .replace(/random stress test(ing)?/gi, 'random testing')
+    .replace(/Stopped because another step failed\./, 'Stopped before it finished.')
+    .replace(/Sweep generator stopped growing at n=(\d+) \(input size \d+\)\./, 'Inputs couldn’t be made larger than n = $1, so timing is too small to measure.')
+}
+
 function StatusIcon({ status }: { status: StageEvent['status'] }) {
   const base = 'flex size-6 shrink-0 items-center justify-center rounded-full'
   if (status === 'running') return <span className={clsx(base, 'bg-accent-soft text-accent')}><Spinner className="size-3" /></span>
@@ -22,7 +40,8 @@ export function Timeline({ stages, execLog, running }: { stages: StageEvent[]; e
       <ol className="relative">
         <AnimatePresence initial={false}>
           {stages.map((s, i) => {
-            const [agent, task] = s.label.includes(':') ? s.label.split(/:(.*)/s, 2) : ['', s.label]
+            const label = LABELS[s.id] ?? s.label
+            const [agent, task] = label.includes(':') ? label.split(/:(.*)/s, 2) : ['', label]
             return (
               <motion.li
                 key={s.id} layout
@@ -37,7 +56,7 @@ export function Timeline({ stages, execLog, running }: { stages: StageEvent[]; e
                     <span className="text-muted">{task.trim()}</span>
                     {PARALLEL.has(s.id) && <span className="rounded bg-sunken px-1 text-[10px] font-medium uppercase tracking-wide text-faint">parallel</span>}
                   </div>
-                  {s.detail && <p className={clsx('mt-0.5 text-[12px] leading-[1.45]', s.status === 'failed' ? 'text-bad' : s.status === 'warning' ? 'text-warn' : 'text-muted')}>{s.detail}</p>}
+                  {s.detail && <p className={clsx('mt-0.5 text-[12px] leading-[1.45]', s.status === 'failed' ? 'text-bad' : s.status === 'warning' ? 'text-warn' : 'text-muted')}>{plain(s.detail)}</p>}
                   {s.status !== 'running' && (s.ms !== undefined) && (
                     <div className="mt-1 flex gap-2 font-mono text-[10.5px] text-faint">
                       <span>{s.ms < 1000 ? `${s.ms}ms` : `${(s.ms / 1000).toFixed(1)}s`}</span>

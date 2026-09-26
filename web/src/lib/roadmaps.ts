@@ -50,3 +50,24 @@ export function nextInRoadmap(data: Roadmaps, id: RoadmapId, current: string): R
   const i = list.findIndex((p) => p.id === current)
   return i >= 0 ? list[i + 1] : undefined
 }
+
+const NUMBER_WORDS: Record<string, string> = {
+  one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
+}
+
+/** Loose title key so "Three Sum" matches "3Sum" and "Two Sum II" matches "Two Sum II - Input Array Is Sorted". */
+export function titleKey(title: string): string {
+  return title.toLowerCase()
+    .replace(/^leetcode\s*\d*[:.)-]?\s*/, '')
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => NUMBER_WORDS[w])
+    .replace(/[^a-z0-9]/g, '')
+}
+
+/** Find a roadmap problem by a free-form title (e.g. a "similar problem" suggestion). */
+export function findByTitle(data: Roadmaps, title: string): RoadmapProblem | undefined {
+  const key = titleKey(title)
+  if (!key) return undefined
+  const open = data.problems.filter(supported)
+  return open.find((p) => titleKey(p.title) === key)
+    ?? open.find((p) => titleKey(p.title).startsWith(key) && key.length >= 6)
+}

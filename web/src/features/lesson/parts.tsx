@@ -3,17 +3,21 @@ import { ArrowDown, Eye } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import type { Json, ProblemSpec } from '../../lib/types'
 import { Button, formatJson } from '../../components/ui'
-import { type ChapterId, useLesson } from './context'
+import { type ChapterId, QUIZ_CHAPTERS, useLesson } from './context'
 
 /** Guided-mode footer: move on once the chapter's task is done (or skip it). */
 export function ContinueBar({ id, enabled, label = 'Continue', hint }: { id: ChapterId; enabled: boolean; label?: string; hint?: string }) {
-  const { guided, isDone, complete } = useLesson()
+  const { guided, isDone, complete, record, scores } = useLesson()
   if (!guided || isDone(id)) return null
+  const skip = () => {
+    if (QUIZ_CHAPTERS.includes(id) && !scores[id]) record(id, { correct: 0, total: 1 })
+    complete(id)
+  }
   return (
     <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4">
       <Button onClick={() => complete(id)} disabled={!enabled}>{label}<ArrowDown className="size-3.5" /></Button>
       {!enabled && (
-        <button onClick={() => complete(id)} className="text-xs text-faint underline-offset-2 hover:text-muted hover:underline">Skip this step</button>
+        <button onClick={skip} className="text-xs text-faint underline-offset-2 hover:text-muted hover:underline">Skip this step</button>
       )}
       {hint && <span className="text-xs text-faint">{hint}</span>}
     </div>

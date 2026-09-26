@@ -50,7 +50,7 @@ export function PatternChapter() {
       {guided && !open && (
         <div className="mt-3 flex items-center gap-3 text-xs text-faint">
           {picked.length > 0 && <span>Not that one. Read why, then try again.</span>}
-          <button onClick={() => setRevealed(true)} className="underline-offset-2 hover:text-muted hover:underline">Show me the answer</button>
+          <button onClick={() => { setRevealed(true); record('pattern', { correct: 0, total: 1 }) }} className="underline-offset-2 hover:text-muted hover:underline">Show me the answer</button>
         </div>
       )}
       {open && (

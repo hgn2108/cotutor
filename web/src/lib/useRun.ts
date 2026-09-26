@@ -39,7 +39,7 @@ type Action =
   | { type: 'start'; problem: string }
   | { type: 'message'; msg: ServerMessage }
   | { type: 'exec'; entry: ExecLogEntry }
-  | { type: 'fail'; message: string }
+  | { type: 'fail'; message: string; code?: string }
   | { type: 'reset' }
   | { type: 'disconnected' }
 
@@ -50,9 +50,9 @@ function reducer(state: RunState, action: Action): RunState {
     case 'reset':
       return initial
     case 'fail':
-      return { ...state, status: 'error', error: { message: action.message } }
+      return { ...state, status: 'error', error: { message: action.message, code: action.code } }
     case 'disconnected':
-      return state.status === 'running' ? { ...state, status: 'error', error: { message: 'Lost connection to the server mid-run. It will reconnect; try again in a moment.' } } : state
+      return state.status === 'running' ? { ...state, status: 'error', error: { message: 'Lost connection to the server mid-run. It will reconnect; try again in a moment.', code: 'disconnected' } } : state
     case 'exec':
       return { ...state, execLog: [...state.execLog, action.entry] }
     case 'message':
@@ -187,7 +187,7 @@ export function useRun() {
 
   const cancel = useCallback(() => {
     wsRef.current?.send(JSON.stringify({ type: 'cancel' }))
-    dispatch({ type: 'fail', message: 'Run cancelled.' })
+    dispatch({ type: 'fail', message: 'Run cancelled.', code: 'cancelled' })
   }, [])
 
   const reset = useCallback(() => dispatch({ type: 'reset' }), [])

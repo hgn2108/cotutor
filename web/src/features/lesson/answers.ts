@@ -47,7 +47,8 @@ const BIG_O = ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)', 'O(n²)', 'O(2ⁿ)']
 
 /** Normalize a Big-O string to one of BIG_O, or null if it's something more specific. */
 export function normalizeBigO(s: string): string | null {
-  const t = s.toLowerCase().replace(/\s+/g, '').replace(/\*/g, '').replace(/\^2|²/g, '²').replace(/\^n|ⁿ/g, 'ⁿ')
+  // "O(1) per operation", "O(n) amortized": grade the Big-O itself.
+  const t = (s.match(/O\([^)]*\)/i)?.[0] ?? s).toLowerCase().replace(/\s+/g, '').replace(/\*/g, '').replace(/\^2|²/g, '²').replace(/\^n|ⁿ/g, 'ⁿ')
   const table: Record<string, string> = {
     'o(1)': 'O(1)', 'o(logn)': 'O(log n)', 'o(n)': 'O(n)', 'o(nlogn)': 'O(n log n)',
     'o(n²)': 'O(n²)', 'o(2ⁿ)': 'O(2ⁿ)',
@@ -56,3 +57,9 @@ export function normalizeBigO(s: string): string | null {
 }
 
 export const bigOOptions = BIG_O
+
+/** Display form: O(n^2) → O(n²), O(2^n) → O(2ⁿ), O(n * m) → O(n·m). */
+export function prettyBigO(s: string | undefined): string {
+  if (!s) return ''
+  return s.replace(/\^2\b/g, '²').replace(/\^3\b/g, '³').replace(/\^n\b/g, 'ⁿ').replace(/\s*\*\s*/g, '·')
+}

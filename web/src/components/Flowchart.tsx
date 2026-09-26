@@ -104,7 +104,7 @@ export function Flowchart({ nodes, edges }: { nodes: FlowNode[]; edges: FlowEdge
             const pill = n.kind === 'start' || n.kind === 'end'
             return (
               <g key={n.id} transform={`translate(${n.x - n.w / 2},${n.y - n.h / 2})`}
-                onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} className="cursor-default">
+                onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} onClick={() => setHover((h) => (h === n.id ? null : n.id))} className="cursor-pointer">
                 {n.kind === 'decision' ? (
                   <polygon points={`12,0 ${n.w - 12},0 ${n.w},${n.h / 2} ${n.w - 12},${n.h} 12,${n.h} 0,${n.h / 2}`} className={clsx(kindStyle[n.kind], 'stroke-[1.4]')} />
                 ) : (
@@ -118,7 +118,7 @@ export function Flowchart({ nodes, edges }: { nodes: FlowNode[]; edges: FlowEdge
         </svg>
       </div>
       <div className="mt-2 min-h-[20px] text-center text-[12.5px] text-muted">
-        {hovered?.detail ? hovered.detail : <span className="text-faint">Hover a step for details · dashed arrows loop back</span>}
+        {hovered?.detail ? hovered.detail : <span className="text-faint">Tap or hover a step for details · dashed arrows loop back</span>}
       </div>
     </div>
   )

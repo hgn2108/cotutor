@@ -19,6 +19,7 @@ describe('spaced repetition', () => {
     expect(p.items.x.box).toBe(0)
     p = recordAttempt(p, 'x', { at: at(1), score: null, mode: 'walkthrough' })
     expect(p.items.x.box).toBe(0)
+    expect(statusOf(p, 'x', at(1.5))).toBe('seen')
     expect(statusOf(p, 'unseen')).toBe('new')
   })
 

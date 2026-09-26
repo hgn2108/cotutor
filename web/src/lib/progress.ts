@@ -12,7 +12,8 @@ const PASS = 0.7
 export interface Attempt { at: number; score: number | null; mode: 'guided' | 'walkthrough' }
 export interface ItemProgress { box: number; lastAt: number; nextDue: number; attempts: Attempt[] }
 export interface Progress { version: 1; items: Record<string, ItemProgress> }
-export type ItemStatus = 'new' | 'due' | 'learned'
+/** seen: opened but not yet passed a guided lesson; learned: passed one (box ≥ 1). */
+export type ItemStatus = 'new' | 'seen' | 'due' | 'learned'
 
 export const emptyProgress = (): Progress => ({ version: 1, items: {} })
 
@@ -33,7 +34,15 @@ export function recordAttempt(p: Progress, id: string, attempt: Attempt): Progre
 export function statusOf(p: Progress, id: string, now = Date.now()): ItemStatus {
   const item = p.items[id]
   if (!item) return 'new'
-  return item.nextDue <= now ? 'due' : 'learned'
+  if (item.nextDue <= now) return 'due'
+  return item.box >= 1 ? 'learned' : 'seen'
+}
+
+/** The most recently attempted id among ``ids``, if any. */
+export function lastAttempted(p: Progress, ids: string[]): string | undefined {
+  let best: string | undefined
+  for (const id of ids) if (p.items[id] && (!best || p.items[id].lastAt > p.items[best].lastAt)) best = id
+  return best
 }
 
 /** Merge an imported file into the current progress, keeping the most recent state per item. */

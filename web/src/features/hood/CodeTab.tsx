@@ -2,7 +2,7 @@ import { DiffEditor, Editor } from '@monaco-editor/react'
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import type { RunState } from '../../lib/useRun'
-import { Badge, Button, Card, SectionTitle, Waiting } from '../../components/ui'
+import { Badge, Button, Card, copyText, SectionTitle, Waiting } from '../../components/ui'
 
 const editorOptions = {
   readOnly: true, minimap: { enabled: false }, fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
@@ -16,13 +16,16 @@ function heightFor(code: string) {
 
 export function CodeTab({ state, dark }: { state: RunState; dark: boolean }) {
   const solution = state.solutions.at(-1)
-  const [copied, setCopied] = useState(false)
-  if (!solution) return <Waiting label="Waiting for the solver…" />
+  const [copied, setCopied] = useState<boolean | null>(null)
+  if (!solution) {
+    return state.status === 'running'
+      ? <Waiting label="Waiting for the solver…" />
+      : <Card className="p-5 text-sm text-muted">No solution was produced because the run stopped early.</Card>
+  }
   const verified = state.summary?.verified
   const copy = async () => {
-    await navigator.clipboard.writeText(solution.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    setCopied(await copyText(solution.code))
+    setTimeout(() => setCopied(null), 1800)
   }
   return (
     <div className="grid gap-4">
@@ -33,7 +36,7 @@ export function CodeTab({ state, dark }: { state: RunState; dark: boolean }) {
           {verified === true && <Badge tone="ok">verified</Badge>}
           {verified === false && <Badge tone="bad">failed verification</Badge>}
           <Button variant="ghost" className="ml-auto text-xs" onClick={copy}>
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}{copied ? 'Copied' : 'Copy'}
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}{copied ? 'Copied' : copied === false ? 'Copy failed: select the code instead' : 'Copy'}
           </Button>
         </div>
         <Editor height={heightFor(solution.code)} language="python" value={solution.code} theme={dark ? 'vs-dark' : 'light'} options={editorOptions} />

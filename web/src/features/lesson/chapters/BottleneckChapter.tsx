@@ -12,18 +12,22 @@ export function BottleneckChapter() {
   const target = intro.bottleneck_line
   const [wrong, setWrong] = useState<number[]>([])
   const [hints, setHints] = useState(0)
-  const [solved, setSolved] = useState(false)
+  const [solved, setSolved] = useState<number | null>(null) // the line the learner found
+  const [askedHint, setAskedHint] = useState(false)
   const [revealed, setRevealed] = useState(false)
   const [n, setN] = useState<number | null>(null)
-  const open = !guided || solved || revealed || target === null
+  const open = !guided || solved !== null || revealed || target === null
   const brute = state.lineCounts?.brute_force
   const { run, heat, gutter } = useLineHeat(brute, n)
+  // Lines in the same hot loop that run at least as often as the answer are also accepted.
+  const biggest = brute?.at(-1)?.counts
+  const inHotLoop = (line: number) => target !== null && !!biggest && (biggest[line] ?? 0) >= (biggest[target] ?? Infinity)
 
   const click = (line: number) => {
     if (open) return
-    if (line === target) {
-      setSolved(true)
-      record('bottleneck', { correct: wrong.length === 0 ? 1 : 0, total: 1 })
+    if (line === target || inHotLoop(line)) {
+      setSolved(line)
+      record('bottleneck', { correct: wrong.length ? 0 : askedHint ? 0.5 : 1, total: 1 })
     } else if (!wrong.includes(line)) {
       setWrong([...wrong, line])
       setHints((h) => Math.min(intro.bottleneck_hints.length, h + 1))
@@ -32,6 +36,7 @@ export function BottleneckChapter() {
   const marks: Record<number, LineMark> = {}
   wrong.forEach((l) => { marks[l] = 'wrong' })
   if (open && target) marks[target] = 'correct'
+  if (solved !== null) marks[solved] = 'correct'
 
   return (
     <div>
@@ -44,18 +49,22 @@ export function BottleneckChapter() {
       />
       {!open && (
         <div className="mt-3 grid gap-2">
+          {wrong.length > 0 && <p className="text-[12.5px] text-bad">Not line {wrong.at(-1)}. Read the hint below and try again.</p>}
           {intro.bottleneck_hints.slice(0, hints).map((h, k) => (
             <Callout key={k} tone="warn" icon={<Lightbulb className="size-4" />}><span className="font-medium">Hint {k + 1}. </span>{h}</Callout>
           ))}
           <div className="flex items-center gap-3 text-xs text-faint">
-            {hints < intro.bottleneck_hints.length && <Button variant="ghost" className="text-xs" onClick={() => setHints(hints + 1)}>Give me a hint</Button>}
-            <button onClick={() => setRevealed(true)} className="underline-offset-2 hover:text-muted hover:underline">Show me the answer</button>
+            {hints < intro.bottleneck_hints.length && <Button variant="ghost" className="text-xs" onClick={() => { setHints(hints + 1); setAskedHint(true) }}>Give me a hint</Button>}
+            <button onClick={() => { setRevealed(true); record('bottleneck', { correct: 0, total: 1 }) }} className="underline-offset-2 hover:text-muted hover:underline">Show me the answer</button>
           </div>
         </div>
       )}
       {open && (
         <div className="mt-4 grid gap-3">
-          {guided && solved && <p className="flex items-center gap-1.5 text-[13.5px] font-medium text-ok"><Check className="size-4" strokeWidth={2.5} />{wrong.length ? 'Found it.' : 'Found it on the first try.'}</p>}
+          {guided && solved !== null && <p className="flex items-center gap-1.5 text-[13.5px] font-medium text-ok"><Check className="size-4" strokeWidth={2.5} />{wrong.length ? 'Found it.' : 'Found it on the first try.'}</p>}
+          {guided && solved !== null && target !== null && solved !== target && (
+            <p className="text-[13px] text-muted">Line {solved} runs the most, but it only runs that often because of line {target}. That line is the real source of the wasted work.</p>
+          )}
           <Prose>{intro.bottleneck}</Prose>
           {brute && run ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-3.5 py-2.5">

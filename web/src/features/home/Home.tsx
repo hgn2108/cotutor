@@ -1,15 +1,24 @@
-import { ArrowRight, FlaskConical, Gauge, MapIcon, Play, Search, ShieldCheck } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { getJson } from '../../lib/api'
-import type { LibraryProblem } from '../../lib/types'
-import { type LearnMode, ModeToggle } from '../../components/ModeToggle'
+import { ArrowRight, Clock, FlaskConical, Gauge, MapIcon, Play, Search, ShieldCheck } from 'lucide-react'
+import { type LearnMode, MODE_HELP, ModeToggle } from '../../components/ModeToggle'
 import { Badge, Button, difficultyTone } from '../../components/ui'
+import { type Progress, statusOf } from '../../lib/progress'
+import { type RoadmapId, roadmapProblems, type Roadmaps, supported } from '../../lib/roadmaps'
+import type { LibraryProblem } from '../../lib/types'
+
+const MIN_LENGTH = 15
 
 interface Props {
   mode: LearnMode
   setMode: (m: LearnMode) => void
+  draft: string
+  setDraft: (text: string) => void
   onSolve: (problem: string) => void
-  onRoadmap: (id: 'blind75' | 'neetcode150') => void
+  library: LibraryProblem[] | null
+  libraryError: boolean
+  onLibrary: (p: LibraryProblem) => void
+  onRoadmap: (id: RoadmapId) => void
+  progress: Progress
+  roadmaps: Roadmaps | null
 }
 
 const pillars = [
@@ -19,12 +28,10 @@ const pillars = [
   { icon: ShieldCheck, title: 'Verified before taught', body: 'Every solution passes tests and hundreds of random inputs in a sandbox before you see it.' },
 ]
 
-export function Home({ mode, setMode, onSolve, onRoadmap }: Props) {
-  const [text, setText] = useState('')
-  const [library, setLibrary] = useState<LibraryProblem[]>([])
-  useEffect(() => { getJson<LibraryProblem[]>('/api/problems').then(setLibrary).catch(() => {}) }, [])
-
-  const submit = () => text.trim().length >= 15 && onSolve(text.trim())
+export function Home({ mode, setMode, draft: text, setDraft: setText, onSolve, library, libraryError, onLibrary, onRoadmap, progress, roadmaps }: Props) {
+  const tooShort = text.trim().length < MIN_LENGTH
+  const submit = () => !tooShort && onSolve(text.trim())
+  const dueIn = (id: RoadmapId) => (roadmaps ? roadmapProblems(roadmaps, id).filter((p) => supported(p) && statusOf(progress, p.id) === 'due').length : 0)
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
@@ -50,21 +57,25 @@ export function Home({ mode, setMode, onSolve, onRoadmap }: Props) {
         <div className="flex flex-wrap items-center gap-2 border-t border-line px-2 pt-2">
           <ModeToggle mode={mode} setMode={setMode} size="sm" />
           <span className="ml-auto hidden text-xs text-faint sm:inline">⌘ + Enter</span>
-          <Button onClick={submit} disabled={text.trim().length < 15}><Play className="size-3.5" />{mode === 'guided' ? 'Start lesson' : 'Explain it'}</Button>
+          <Button onClick={submit} disabled={tooShort}><Play className="size-3.5" />{mode === 'guided' ? 'Start lesson' : 'Explain it'}</Button>
         </div>
+        <p className="px-2 pb-1 pt-2 text-xs text-muted">
+          {text.trim() && tooShort ? 'Paste the full problem statement (at least a sentence), or pick a problem from a roadmap below.' : MODE_HELP[mode]}
+        </p>
       </div>
 
       <div className="mt-12">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-sm font-semibold">Follow a roadmap</h2>
-          <span className="text-xs text-faint">Progress and review reminders are saved in your browser</span>
+          <span className="hidden text-xs text-muted sm:inline">Your progress and review schedule are saved in this browser</span>
         </div>
         <div className="grid gap-2.5 sm:grid-cols-2">
           {([['blind75', 'Blind 75', 'The classic interview shortlist, one problem per core pattern.'],
              ['neetcode150', 'NeetCode 150', 'Blind 75 plus 75 more, grouped into 18 patterns.']] as const).map(([id, title, body]) => (
             <button key={id} onClick={() => onRoadmap(id)} className="group rounded-xl border border-line bg-panel p-4 text-left transition hover:border-accent/50 hover:shadow-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-[15px] font-semibold"><MapIcon className="size-4 text-accent" />{title}</span>
+                {dueIn(id) > 0 && <Badge tone="warn" className="ml-auto"><Clock className="size-3" />{dueIn(id)} due for review</Badge>}
                 <ArrowRight className="size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-accent" />
               </div>
               <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{body}</p>
@@ -73,15 +84,18 @@ export function Home({ mode, setMode, onSolve, onRoadmap }: Props) {
         </div>
       </div>
 
-      {library.length > 0 && (
+      {libraryError && (
+        <p className="mt-12 rounded-xl border border-line bg-panel p-4 text-center text-[13px] text-muted">Can’t reach the Cotutor server to load example problems. It may be waking up; refresh in a minute.</p>
+      )}
+      {library && library.length > 0 && (
         <div className="mt-12">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold">Try a classic</h2>
-            <span className="text-xs text-faint">Previously verified runs replay instantly</span>
+            <span className="text-xs text-muted">Already verified, so they open instantly</span>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {library.map((p) => (
-              <button key={p.id} onClick={() => onSolve(p.statement)} className="group rounded-xl border border-line bg-panel p-3.5 text-left transition hover:border-accent/50 hover:shadow-sm">
+              <button key={p.id} onClick={() => onLibrary(p)} className="group rounded-xl border border-line bg-panel p-3.5 text-left transition hover:border-accent/50 hover:shadow-sm">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium">{p.title}</span>
                   <ArrowRight className="size-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-accent" />

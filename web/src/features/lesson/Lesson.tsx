@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BadgeCheck, Check, ChevronRight, Lock, ShieldAlert } from 'lucide-react'
+import { BadgeCheck, Check, ChevronRight, CircleSlash, Lock, ShieldAlert } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '../../components/ui'
 import type { RunState } from '../../lib/useRun'
@@ -39,13 +39,15 @@ interface Props {
   state: RunState
   guided: boolean
   dark: boolean
-  onSolve: (problem: string) => void
+  visible: boolean
+  onPractice: (title: string) => void
   onUnderTheHood: () => void
   roadmap?: RoadmapLink
   onComplete?: (score: number | null, mode: 'guided' | 'walkthrough') => void
+  onDirty?: (dirty: boolean) => void
 }
 
-export function Lesson({ state, guided, dark, onSolve, onUnderTheHood, roadmap, onComplete }: Props) {
+export function Lesson({ state, guided, dark, visible, onPractice, onUnderTheHood, roadmap, onComplete, onDirty }: Props) {
   const [done, setDone] = useState<Set<ChapterId>>(new Set())
   const [scores, setScores] = useState<Partial<Record<ChapterId, Score>>>({})
   const refs = useRef<Partial<Record<ChapterId, HTMLElement | null>>>({})
@@ -60,22 +62,31 @@ export function Lesson({ state, guided, dark, onSolve, onUnderTheHood, roadmap, 
   }, [finished, onComplete, guided])
   const complete = useCallback((id: ChapterId) => {
     lastCompleted.current = id
-    const next = new Set(done).add(id)
-    setDone(next)
-    // A guided lesson is finished once every step is done; its score feeds spaced repetition.
-    if (guided && CHAPTERS.every((c) => next.has(c.id))) {
-      const t = Object.values(scores).reduce((a, x) => ({ c: a.c + x.correct, n: a.n + x.total }), { c: 0, n: 0 })
-      finish(t.n ? t.c / t.n : null)
-    }
-  }, [done, guided, scores, finish])
+    setDone((d) => new Set(d).add(id))
+  }, [])
+
+  // A guided lesson is finished once every step is done; its score feeds spaced repetition.
+  // Skipped questions count as misses, so skipping through never marks a problem learned.
+  useEffect(() => {
+    if (!guided || finished || !CHAPTERS.every((c) => done.has(c.id))) return
+    const t = Object.values(scores).reduce((a, x) => ({ c: a.c + x.correct, n: a.n + x.total }), { c: 0, n: 0 })
+    finish(t.n ? t.c / t.n : 0)
+  }, [done, scores, guided, finished, finish])
+
+  useEffect(() => { onDirty?.(guided && done.size > 0 && !finished) }, [guided, done, finished, onDirty])
+
   const ctx: LessonCtx = useMemo(() => ({
-    state, guided, dark, onSolve, scores, record, complete, isDone: (id) => done.has(id), roadmap, finish, finished,
-  }), [state, guided, dark, onSolve, scores, record, complete, done, roadmap, finish, finished])
+    state, guided, dark, visible, onPractice, scores, record, complete, isDone: (id) => done.has(id), roadmap, finish, finished,
+  }), [state, guided, dark, visible, onPractice, scores, record, complete, done, roadmap, finish, finished])
 
   const runFinished = state.status !== 'running'
+  const failed = state.status === 'error'
   const firstOpen = CHAPTERS.findIndex((c) => !done.has(c.id))
   const unlockedUpTo = guided ? (firstOpen === -1 ? CHAPTERS.length - 1 : firstOpen) : CHAPTERS.length - 1
-  const visible = CHAPTERS.slice(0, unlockedUpTo + 1)
+  // A run that stopped early shows what it managed to prepare, then one explanation instead of empty steps.
+  const firstMissing = CHAPTERS.findIndex((c) => !c.ready(state))
+  const cutoff = failed && firstMissing >= 0 ? firstMissing : CHAPTERS.length
+  const shown = CHAPTERS.slice(0, Math.min(unlockedUpTo + 1, cutoff))
 
   // After finishing a chapter, bring the next one into view.
   useEffect(() => {
@@ -88,55 +99,47 @@ export function Lesson({ state, guided, dark, onSolve, onUnderTheHood, roadmap, 
 
   const jump = (id: ChapterId) => refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const running = state.stages.filter((s) => s.status === 'running')
+  const currentIdx = guided ? unlockedUpTo : -1
 
   return (
     <LessonContext.Provider value={ctx}>
-      <div className="grid gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <nav className="grid gap-0.5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-6">
+        <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+          <nav aria-label="Lesson steps" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0">
             {CHAPTERS.map((c, k) => {
-              const locked = k > unlockedUpTo
+              const unavailable = k >= cutoff
+              const locked = k > unlockedUpTo || unavailable
               const isDone = done.has(c.id)
               const ready = c.ready(state)
-              const current = guided && k === unlockedUpTo && !isDone
+              const current = k === currentIdx && !isDone && !unavailable
               return (
-                <button key={c.id} disabled={locked} onClick={() => jump(c.id)}
-                  className={clsx('flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition',
+                <button key={c.id} disabled={locked} onClick={() => jump(c.id)} aria-current={current ? 'step' : undefined}
+                  title={unavailable ? 'Not prepared: the run stopped early' : locked ? 'Finish the earlier steps to unlock' : c.title}
+                  className={clsx('flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition',
                     current ? 'bg-accent-soft font-medium text-ink' : 'text-muted hover:bg-sunken hover:text-ink', locked && 'cursor-default opacity-45 hover:bg-transparent hover:text-muted')}>
                   <span className={clsx('flex size-5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold',
                     isDone ? 'bg-ok-soft text-ok' : current ? 'bg-accent text-white dark:text-[#0e0e13]' : 'bg-sunken text-faint')}>
                     {isDone ? <Check className="size-3" strokeWidth={3} /> : locked ? <Lock className="size-2.5" /> : k + 1}
                   </span>
-                  <span className="flex-1 truncate">{c.title}</span>
-                  {!ready && !runFinished && !locked && <Spinner className="size-3 text-faint" />}
+                  <span className={clsx('flex-1 truncate', !current && 'hidden lg:inline')}>{c.title}</span>
+                  {!ready && !runFinished && !locked && <Spinner className="hidden size-3 text-faint lg:inline-block" />}
                 </button>
               )
             })}
           </nav>
-          <button onClick={onUnderTheHood} className="mt-4 w-full rounded-xl border border-line bg-panel p-3 text-left transition hover:border-accent/50">
-            {state.summary ? (
-              state.summary.verified
-                ? <div className="flex items-center gap-1.5 text-[13px] font-medium text-ok"><BadgeCheck className="size-4" />Solution verified</div>
-                : <div className="flex items-center gap-1.5 text-[13px] font-medium text-bad"><ShieldAlert className="size-4" />Not verified</div>
-            ) : (
-              <div className="flex items-center gap-2 text-[13px] font-medium"><Spinner className="size-3 text-accent" />Agents at work</div>
-            )}
-            <p className="mt-1 text-[11.5px] leading-4 text-muted">
-              {state.summary
-                ? `${state.summary.tests_passed ?? 0}/${state.summary.tests_total ?? 0} tests · ${state.summary.stress_trials ?? 0} random trials`
-                : running.length ? running.map((s) => s.label.split(':')[0]).join(', ') : 'Starting…'}
-            </p>
+          <button onClick={onUnderTheHood} className="mt-4 hidden w-full rounded-xl border border-line bg-panel p-3 text-left transition hover:border-accent/50 lg:block">
+            <HoodStatus state={state} running={running.map((s) => s.label.split(':')[0])} />
             <span className="mt-1.5 flex items-center gap-0.5 text-[11.5px] font-medium text-accent">Under the hood <ChevronRight className="size-3" /></span>
           </button>
         </aside>
 
-        <div className="grid gap-5">
-          {visible.map((c, k) => {
+        <div className="grid min-w-0 gap-5">
+          {shown.map((c, k) => {
             const ready = c.ready(state)
             return (
-              <section key={c.id} ref={(el) => { refs.current[c.id] = el }} className="scroll-mt-20 rounded-2xl border border-line bg-panel p-5 sm:p-6">
+              <section key={c.id} ref={(el) => { refs.current[c.id] = el }} className="min-w-0 scroll-mt-20 rounded-2xl border border-line bg-panel p-4 sm:p-6">
                 <header className="mb-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">Step {k + 1}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">Step {k + 1} of {CHAPTERS.length}</div>
                   <h2 className="mt-0.5 text-[19px] font-semibold tracking-tight">{c.title}</h2>
                   <p className="mt-0.5 text-[13.5px] text-muted">{c.blurb}</p>
                 </header>
@@ -148,12 +151,42 @@ export function Lesson({ state, guided, dark, onSolve, onUnderTheHood, roadmap, 
               </section>
             )
           })}
-          {guided && firstOpen === -1 && (
-            <p className="py-4 text-center text-sm text-muted">Lesson complete. Try a similar problem above to lock the pattern in.</p>
+          {failed && cutoff < CHAPTERS.length && (guided ? unlockedUpTo >= cutoff : true) && (
+            <div className="rounded-2xl border border-dashed border-line p-5 text-center text-[13.5px] text-muted">
+              The rest of this lesson couldn’t be prepared because the run stopped early. See the message above to try again.
+            </div>
           )}
         </div>
       </div>
     </LessonContext.Provider>
+  )
+}
+
+function HoodStatus({ state, running }: { state: RunState; running: string[] }) {
+  if (state.status === 'error') {
+    return (
+      <>
+        <div className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><CircleSlash className="size-4" />Run stopped</div>
+        <p className="mt-1 text-[11.5px] leading-4 text-muted">It ended before the solution could be verified.</p>
+      </>
+    )
+  }
+  if (!state.summary) {
+    return (
+      <>
+        <div className="flex items-center gap-2 text-[13px] font-medium"><Spinner className="size-3 text-accent" />Agents at work</div>
+        <p className="mt-1 text-[11.5px] leading-4 text-muted">{running.length ? running.join(', ') : 'Starting…'}</p>
+      </>
+    )
+  }
+  const s = state.summary
+  return (
+    <>
+      {s.verified
+        ? <div className="flex items-center gap-1.5 text-[13px] font-medium text-ok"><BadgeCheck className="size-4" />Solution verified</div>
+        : <div className="flex items-center gap-1.5 text-[13px] font-medium text-bad"><ShieldAlert className="size-4" />Not verified</div>}
+      <p className="mt-1 text-[11.5px] leading-4 text-muted">{s.tests_passed ?? 0}/{s.tests_total ?? 0} tests passed · {s.stress_trials ?? 0} random inputs checked</p>
+    </>
   )
 }
 

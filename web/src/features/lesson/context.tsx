@@ -5,6 +5,9 @@ export type ChapterId = 'problem' | 'pattern' | 'brute' | 'bottleneck' | 'insigh
 
 export interface Score { correct: number; total: number }
 
+/** Chapters with a question; skipping or revealing one counts as a miss. */
+export const QUIZ_CHAPTERS: ChapterId[] = ['pattern', 'bottleneck', 'watch', 'complexity', 'edges']
+
 /** Set when the lesson was opened from a roadmap. */
 export interface RoadmapLink {
   title: string
@@ -20,7 +23,10 @@ export interface LessonCtx {
   complete: (id: ChapterId) => void
   record: (id: ChapterId, score: Score) => void
   scores: Partial<Record<ChapterId, Score>>
-  onSolve: (problem: string) => void
+  /** Open a suggested problem by title (from the roadmap when possible). */
+  onPractice: (title: string) => void
+  /** Whether the lesson view is on screen (not hidden behind Under the hood). */
+  visible: boolean
   dark: boolean
   roadmap?: RoadmapLink
   /** Mark the lesson finished: guided mode reports a score, walkthrough reports null. */

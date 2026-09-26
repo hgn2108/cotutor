@@ -42,20 +42,22 @@ export function Header(p: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
-        <button onClick={p.onHome} className="flex items-center gap-2.5">
+        <button onClick={p.onHome} className="flex items-center gap-2.5" aria-label="Cotutor home">
           <img src="/favicon.svg" alt="" className="size-7" />
           <span className="text-[15px] font-semibold tracking-tight">Cotutor</span>
         </button>
-        <nav className="ml-2 flex items-center gap-1 text-[13px]">
+        <nav className="ml-1 flex sm:ml-3 items-center gap-1 text-[13px]">
           <button onClick={p.onRoadmaps} className={`rounded-md px-2.5 py-1 font-medium transition ${p.onRoadmapsPage ? 'bg-sunken text-ink' : 'text-muted hover:text-ink'}`}>Roadmaps</button>
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Badge tone={tone} className="hidden sm:inline-flex" title="Code runs locally in your browser via Pyodide (WebAssembly)">
-            <span className="size-1.5 rounded-full bg-current" />{label}
-          </Badge>
+          <span className="hidden sm:block">
+            <Badge tone={tone} title="Code runs locally in your browser via Pyodide (WebAssembly)">
+              <span className="size-1.5 rounded-full bg-current" />{label}
+            </Badge>
+          </span>
           {!p.connected && (
-            <Badge tone="warn" title="The free server sleeps when idle and can take up to a minute to wake up.">
-              <span className="size-1.5 animate-pulse rounded-full bg-current" />Waking up server…
+            <Badge tone="warn" title="The free server sleeps when idle and can take up to a minute to wake up. Retrying automatically.">
+              <span className="size-1.5 animate-pulse rounded-full bg-current" />Connecting to server…
             </Badge>
           )}
           <a href="https://github.com/hgn2108/cotutor" target="_blank" rel="noreferrer" className="rounded-lg p-2 text-muted hover:bg-sunken hover:text-ink" aria-label="GitHub">
@@ -74,11 +76,11 @@ export function Header(p: Props) {
                 <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted"><KeyRound className="size-3.5" />Your Gemini API key (optional)</label>
                 <input
                   type="password" value={p.apiKey} onChange={(e) => p.setApiKey(e.target.value)}
-                  placeholder={p.features?.server_key ? 'Using the shared server key' : 'Required: no server key configured'}
-                  className="w-full rounded-lg border border-line bg-sunken px-3 py-2 font-mono text-xs outline-none focus:border-accent"
+                  placeholder={p.features?.server_key ? 'Optional: paste your own key' : 'Required: no server key configured'}
+                  className="w-full rounded-lg border border-line bg-sunken px-3 py-2 font-mono text-xs outline-none placeholder:font-sans focus:border-accent"
                 />
                 <p className="mt-1.5 text-[11px] leading-4 text-faint">
-                  Free from <a className="underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>. Kept in this browser only and sent to the server just for your runs; lifts the shared hourly limit.
+                  Free from <a className="underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>. Kept in this browser only and sent to the server just for your runs. Lets you keep going when the shared limit runs out.
                 </p>
                 <div className="mt-4 mb-1.5 text-xs font-medium text-muted">Theme</div>
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-sunken p-1">
