@@ -4,7 +4,9 @@
 
 **An algorithm tutor that teaches the reasoning behind coding problems, not just the answer, and verifies every solution before teaching it.**
 
-<!-- TODO: live demo link + GIF of a Guided lesson -->
+**Live demo: [cotutor-lyart.vercel.app](https://cotutor-lyart.vercel.app)** (the free backend sleeps when idle; the first visit can take about a minute to wake it)
+
+<!-- TODO: GIF of a Guided lesson -->
 
 Most people prepare for coding interviews by reading solutions until they recognize them. That turns into memorization: it works for problems you've seen and breaks on the ones you haven't. Cotutor instead walks you through how a solution is *derived*: which words in the problem point to a technique, what the obvious approach is, where it wastes work, how to remove that work, and why the result has the complexity it does. It also checks that it isn't teaching you something wrong.
 

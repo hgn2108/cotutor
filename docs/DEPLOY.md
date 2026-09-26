@@ -15,7 +15,7 @@ The frontend shows "Waking up server…" and retries while a sleeping backend st
 2. **New → Blueprint** → connect `hgn2108/cotutor` → Render reads `render.yaml` and proposes the `cotutor-api` service.
 3. Fill in the two secrets it asks for:
    - `GEMINI_API_KEY`: a key reserved for the public demo (a separate Google AI Studio project from your personal key).
-   - `COTUTOR_ALLOWED_ORIGINS`: your Vercel URL, e.g. `https://cotutor.vercel.app` (use `http://localhost:5173` until you have it).
+   - `COTUTOR_ALLOWED_ORIGINS`: your exact Vercel URL, e.g. `https://cotutor-lyart.vercel.app` (use `http://localhost:5173` until you have it). Avoid broad patterns: any site allowed here can spend the demo's API quota.
 4. **Apply**. The first build takes a few minutes. Then check `https://cotutor-api.onrender.com/api/health` (Render shows the exact URL).
 
 Every push to `main` that changes `backend/` redeploys automatically.

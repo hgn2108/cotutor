@@ -17,5 +17,3 @@ services:
         sync: false
       - key: COTUTOR_ALLOWED_ORIGINS
         sync: false
-      - key: COTUTOR_ALLOWED_ORIGIN_REGEX
-        value: ^https://cotutor(-[a-z0-9-]+)?\.vercel\.app$
