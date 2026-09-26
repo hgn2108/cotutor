@@ -56,3 +56,15 @@ async def test_scoring_catches_a_false_verification():
     agg = aggregate([score.to_dict()])
     assert agg["false_verified"] == ["best-time-to-buy-and-sell-stock"]
     assert agg["verified_precision"].startswith("0/1")
+
+
+def test_rate_limited_runs_are_excluded_not_counted_wrong():
+    from evals.report import aggregate
+
+    ok = {"id": "a", "final_correct": True, "first_draft_correct": True, "verified": True,
+          "complexity_correct": True, "pattern_correct": True, "pattern": "x", "naive_check": None,
+          "stress_caught": False, "oracle_trusted": True, "lesson_complete": True, "llm_calls": 6,
+          "tokens": 100, "seconds": 10, "fell_back": False, "golden_failure": None, "infra_error": False}
+    limited = ok | {"id": "b", "final_correct": None, "verified": False, "infra_error": True}
+    agg = aggregate([ok, limited])
+    assert agg["runs"] == 1 and agg["infra_errors"] == ["b"] and agg["correct"].startswith("1/1")

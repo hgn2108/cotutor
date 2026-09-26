@@ -15,7 +15,10 @@ def _pct(values: list[float], q: float) -> float:
     return s[min(len(s) - 1, int(q * (len(s) - 1) + 0.5))] if s else 0.0
 
 
-def aggregate(scores: list[dict[str, Any]]) -> dict[str, Any]:
+def aggregate(all_scores: list[dict[str, Any]]) -> dict[str, Any]:
+    # Runs that died on rate limits or outages are reported, not counted as right or wrong.
+    infra = [s["id"] for s in all_scores if s.get("infra_error")]
+    scores = [s for s in all_scores if not s.get("infra_error")]
     scored = [s for s in scores if s["final_correct"] is not None]
     verified = [s for s in scored if s["verified"]]
     false_verified = [s["id"] for s in verified if not s["final_correct"]]
@@ -30,6 +33,7 @@ def aggregate(scores: list[dict[str, Any]]) -> dict[str, Any]:
     seconds = [s["seconds"] for s in scores if s["seconds"]]
     return {
         "runs": len(scores),
+        "infra_errors": infra,
         "correct": _rate(sum(s["final_correct"] for s in scored), len(scored)),
         "verified": _rate(len(verified), len(scored)),
         "verified_precision": _rate(len(verified) - len(false_verified), len(verified)),
@@ -70,7 +74,10 @@ def markdown(title: str, agg: dict[str, Any], note: str = "") -> str:
         ("Latency median · p90", f"{agg['median_seconds']:.0f} s · {agg['p90_seconds']:.0f} s"),
         ("Runs that fell back to a lighter model", agg["fell_back"]),
     ]
-    out = [f"## {title}", "", note, "" if note else "", "| Metric | Result |", "|---|---|"]
+    excluded = len(agg["infra_errors"])
+    scored_line = f"Runs scored: {agg['runs']}" + (
+        f" ({excluded} more hit rate limits and are excluded)" if excluded else "")
+    out = [f"## {title}", "", note, "" if note else "", scored_line, "", "| Metric | Result |", "|---|---|"]
     out += [f"| {k} | {v} |" for k, v in rows]
     naive = ", ".join(f"{k} {v}" for k, v in sorted(agg["naive_check"].items()))
     out += ["", f"Naive-brute-force check outcomes: {naive or 'n/a'}."]

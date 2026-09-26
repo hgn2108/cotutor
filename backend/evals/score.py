@@ -41,6 +41,7 @@ class RunScore:
     models: list[str] = field(default_factory=list)
     fell_back: bool = False
     error: str | None = None
+    infra_error: bool = False  # rate limits / outages: says nothing about the pipeline itself
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -72,6 +73,10 @@ async def golden_check(golden: Golden, code: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def is_infra_error(error: str | None) -> bool:
+    return bool(error) and any(k in error for k in ("overloaded", "429", "503", "unavailable"))
+
+
 def complexity_matches(claimed: str, truth: str) -> bool | None:
     claim, gold = _first_big_o(claimed), _first_big_o(truth)
     a, b = expected_slope(claim), expected_slope(gold)
@@ -98,6 +103,7 @@ async def score_run(golden: Golden, events: list[dict]) -> RunScore:
     done = [e for e in events if e.get("type") == "done"]
     summary = done[-1]["summary"] if done else {}
     s.error = summary.get("error")
+    s.infra_error = is_infra_error(s.error)
     s.verified = bool(summary.get("verified"))
     s.attempts = summary.get("attempts") or 0
     s.llm_calls = summary.get("llm_calls", 0)

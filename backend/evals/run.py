@@ -73,6 +73,8 @@ async def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--only", nargs="*", default=[])
     parser.add_argument("--name", default="")
+    parser.add_argument("--resume", help="continue a previous live run directory")
+    parser.add_argument("--pause", type=float, default=10, help="seconds between live runs")
     args = parser.parse_args()
 
     goldens = [g for g in GOLDEN if not args.only or g.id in args.only]
@@ -83,16 +85,31 @@ async def main() -> None:
         if not settings.gemini_api_key:
             raise SystemExit("Set GEMINI_API_KEY in .env first.")
         llm = GeminiClient(settings.gemini_api_key, settings.smart_models, settings.fast_models)
-        runs_dir = EVALS / "runs" / time.strftime("%Y%m%d-%H%M%S")
+        runs_dir = Path(args.resume) if args.resume else EVALS / "runs" / time.strftime("%Y%m%d-%H%M%S")
         runs_dir.mkdir(parents=True, exist_ok=True)
-        for g in goldens:
+        quota_streak = 0
+        for i, g in enumerate(goldens):
+            path = runs_dir / f"{g.id}.json"
+            if path.exists():  # resume: keep finished runs, retry ones that hit rate limits
+                score = await score_run(g, _load(path))
+                if not score.infra_error:
+                    scores.append(score.to_dict())
+                    continue
+            if i and args.pause:
+                await asyncio.sleep(args.pause)
             events = await live_events(g, llm, debug=not args.no_debug)
-            (runs_dir / f"{g.id}.json").write_text(json.dumps({"id": g.id, "events": events}))
+            path.write_text(json.dumps({"id": g.id, "events": events}))
             score = await score_run(g, events)
             scores.append(score.to_dict())
-            print(f"{g.id:<50} correct={score.final_correct} verified={score.verified} {score.seconds}s")
+            print(f"{g.id:<50} correct={score.final_correct} verified={score.verified} {score.seconds}s"
+                  + (" [rate limited]" if score.infra_error else ""))
+            quota_streak = quota_streak + 1 if score.infra_error else 0
+            if quota_streak >= 3:
+                print(f"\nStopping: the API quota looks exhausted. Resume later with:\n"
+                      f"  uv run python -m evals.run --live --resume {runs_dir}")
+                break
         name = args.name or ("live-no-debug" if args.no_debug else "live")
-        note = f"{len(scores)} fresh runs from problem names · models {settings.smart_models[0]} → fallbacks"
+        note = f"Fresh runs from problem names · models {settings.smart_models[0]} with fallbacks"
     else:
         missing = []
         for g in goldens:
