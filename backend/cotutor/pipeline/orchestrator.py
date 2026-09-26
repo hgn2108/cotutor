@@ -60,7 +60,7 @@ class Pipeline:
             summary = await self._run(problem, known)
         except LLMError as exc:
             summary = {"verified": False, "error": str(exc)}
-            await self.ctx.emit({"type": "error", "message": str(exc)})
+            await self.ctx.emit({"type": "error", "code": "overloaded", "message": str(exc)})
         except Exception as exc:  # never leave the UI waiting on a run that died
             log.exception("pipeline crashed")
             summary = {"verified": False, "error": f"Internal error: {type(exc).__name__}"}
@@ -144,7 +144,7 @@ class Pipeline:
         return spec
 
     async def _design_tests(self, spec: ProblemSpec) -> TestPlan:
-        async with self.ctx.stage("design_tests", "Test Designer: edge cases + brute-force oracle") as st:
+        async with self.ctx.stage("design_tests", "Test Designer: edge cases + a slow reference solution") as st:
             plan, u = await agents.design_tests(self.ctx.llm, spec)
             st.usage(u)
             st.note(f"{len(plan.cases)} targeted inputs, brute-force reference, random input "

@@ -62,7 +62,7 @@ class Profiler:
         """
         if not plan.generator_code.strip():
             return ReferenceCheck(plan, False)
-        async with self.ctx.stage("naive_check", "Check the brute force is really brute force") as st:
+        async with self.ctx.stage("naive_check", "Confirm the slow version is really slow") as st:
             sol = await self.step_growth(spec, solution.code, plan.generator_code)
             ref = await self.step_growth(spec, plan.reference_solution, plan.generator_code)
             if sol is None or ref is None or ref >= sol + 0.5:

@@ -80,7 +80,7 @@ class Verifier:
         """
         oracle = Oracle(plan.reference_solution, plan.checker_code.strip() or None)
         corrected: list[str] = []
-        async with self.ctx.stage("oracle", "Verify the verifier: check oracle on examples") as st:
+        async with self.ctx.stage("oracle", "Check the answer key: reference solution vs. examples") as st:
             examples = [c for c in cases if c["source"] == "example"]
             if not examples:
                 st.note("No parseable examples; generated cases can only catch crashes.", "warning")
@@ -97,11 +97,11 @@ class Verifier:
                     st.note(f"Corrected {len(corrected)} made-up example(s): the brute force and the "
                             "solution independently agreed on a different answer.", "warning")
                 elif oracle.trusted:
-                    st.note(f"Brute-force oracle matches all {len(examples)} examples; "
-                            "using it to compute expected outputs.")
+                    st.note(f"The reference solution reproduces all {len(examples)} examples, "
+                            "so it can grade the other tests.")
                 else:
-                    st.note("Oracle disagreed with the examples, so only the examples are "
-                            "checked for correctness.", "warning")
+                    st.note("The reference solution got an example wrong, so only the examples "
+                            "are graded exactly.", "warning")
         await self.ctx.artifact("oracle", {"trusted": oracle.trusted, "corrected_examples": corrected,
                                            "has_checker": bool(oracle.checker_code)})
         return oracle
@@ -167,17 +167,17 @@ class Verifier:
                     cid = f"stress{attempt + 1}"
                     # Keep it as a regression test for every later attempt.
                     by_id[cid] = {"id": cid, "args": counterexample["args"],
-                                  "source": "stress", "label": "Found by random stress test"}
+                                  "source": "stress", "label": "Found by random testing"}
                     failures = [{"id": cid, "status": "fail" if "got" in counterexample else "error",
                                  **counterexample}]
 
             verified = not failures
             if counterexample:
-                note = (f"{passed}/{len(results)} tests pass, but random stress testing found a "
-                        f"counterexample after {trials} trials")
+                note = (f"{passed}/{len(results)} tests pass, but random testing found a "
+                        f"failing input after {trials} tries")
             else:
                 note = f"{passed}/{len(results)} tests pass" + (
-                    f", {trials} random stress trials agree with the oracle" if trials else "")
+                    f", {trials} random inputs agree with the reference solution" if trials else "")
                 if failures:
                     note += f" ({len(failures)} failing)"
             st.note(note, "done" if verified else "failed")

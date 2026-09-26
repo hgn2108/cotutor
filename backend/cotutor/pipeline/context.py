@@ -82,7 +82,7 @@ class Stage:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         if isinstance(exc, asyncio.CancelledError):
-            status, self.detail = "skipped", self.detail or "Stopped because another step failed."
+            status, self.detail = "skipped", self.detail or "Stopped before it finished."
         else:
             status = "failed" if exc else (self.status or "done")
             if exc and not self.detail:
