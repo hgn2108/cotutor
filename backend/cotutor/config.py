@@ -15,6 +15,11 @@ def _csv(name: str, default: str) -> list[str]:
     return [s.strip() for s in os.getenv(name, default).split(",") if s.strip()]
 
 
+def _origin(value: str) -> str:
+    """Browsers send origins as scheme://host[:port]; tolerate quotes and a trailing slash."""
+    return value.strip().strip("\"'").rstrip("/")
+
+
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
@@ -31,7 +36,7 @@ class Settings:
     runs_per_hour_per_ip: int = int(os.getenv("COTUTOR_RUNS_PER_HOUR", "20"))
     cache_dir: Path = Path(os.getenv("COTUTOR_CACHE_DIR", Path(__file__).parent / "data" / "cache"))
     allowed_origins: list[str] = field(
-        default_factory=lambda: _csv("COTUTOR_ALLOWED_ORIGINS", "http://localhost:5173")
+        default_factory=lambda: [_origin(o) for o in _csv("COTUTOR_ALLOWED_ORIGINS", "http://localhost:5173")]
     )
     # Optional regex for extra origins, e.g. Vercel preview deployments:
     #   ^https://cotutor(-[a-z0-9-]+)?\.vercel\.app$

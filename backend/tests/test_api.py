@@ -85,3 +85,12 @@ def test_origin_rules():
     assert not s.origin_allowed("https://cotutor.vercel.app.evil.com")
     assert not s.origin_allowed("http://localhost:3000")
     assert s.origin_allowed(None)
+
+
+def test_allowed_origins_tolerate_common_formatting(monkeypatch):
+    from cotutor.config import Settings
+
+    monkeypatch.setenv("COTUTOR_ALLOWED_ORIGINS", ' "https://cotutor-lyart.vercel.app/" , http://localhost:5173/')
+    s = Settings()
+    assert s.allowed_origins == ["https://cotutor-lyart.vercel.app", "http://localhost:5173"]
+    assert s.origin_allowed("https://cotutor-lyart.vercel.app")
