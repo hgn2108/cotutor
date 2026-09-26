@@ -58,7 +58,7 @@ Pick a roadmap and work through it pattern by pattern. Progress, quiz scores and
 - **No problem statements are stored or scraped.** Each lesson starts from the problem's number, title and function signature. The Analyst restates the problem in its own Input / Output / Rules format and links to the original on LeetCode, where you can submit your own solution.
 - **The right problem, verified.** The stored signature is checked against the Analyst's reconstruction before anything is taught; on a mismatch Cotutor asks you to paste the statement instead. In testing, 20 of 20 problems were reconstructed exactly from their names.
 - **Instant lessons.** Recorded lessons replay immediately for everyone; the rest are generated (about 25 s) and cached.
-- **Coverage.** 145 of 151 problems, including design problems (LRU Cache, Min Stack, Trie, …) replayed through LeetCode's operation-sequence format. Six that need graph nodes, cycles, random pointers or round-trip codecs are coming.
+- **Coverage.** All 151 problems: plain functions, design classes replayed through LeetCode's operation-sequence format (LRU Cache, Trie, …), graph nodes and random-pointer lists (clone problems must return a real deep copy), cyclic lists, node references (LCA) and encode/decode round trips.
 
 Lists: [NeetCode 150](https://neetcode.io/practice) by NeetCode and the original [Blind 75](https://www.teamblind.com/post/New-Year-Gift---Curated-List-of-Top-75-LeetCode-Questions-to-Save-Your-Time-OaM1orEU). Problems belong to LeetCode.
 
@@ -89,6 +89,8 @@ flowchart LR
 - **Don't trust generated test inputs either.** LLM-written "worst case" generators often aren't worst case, so growth is measured with both the random and the worst-case generator and the worse result is kept. Generators that stop growing are detected, so a flat timing curve isn't mistaken for a fast algorithm.
 - **Untrusted code never runs on the server.** A stdlib-only harness ([`runtime/harness.py`](backend/cotutor/runtime/harness.py)) runs in the learner's browser, in Pyodide inside a Web Worker. The server requests executions over the WebSocket. The same harness runs in a local subprocess for tests and evals. Runaway code is handled by killing the worker, and streamed progress events show which test hung.
 - **Survive free-tier limits.** A health-aware model router tries a fallback chain of models, puts overloaded models on a shared cooldown, and retries in rounds. Falling back to a lighter model is safe because every output is verified.
+- **Know what it can't verify.** Problems that can't be checked by running a Python function or class (interactive judge APIs, randomized output, SQL/shell/concurrency, third-party libraries) are declined with the reason instead of producing an unverifiable lesson.
+- **Made-up examples aren't ground truth.** For statements without examples the Analyst invents some. If the brute force and the solution, written independently, agree with each other against an invented example, the example is corrected rather than the correct code being "fixed". Examples from the user's statement stay authoritative.
 - **Teach while verifying.** The first half of the lesson only needs the spec and the oracle, so it is written in parallel with verification. Test design also runs in parallel with solving.
 
 ## Code layout
@@ -153,11 +155,13 @@ The server only orchestrates. Code execution happens in each visitor's browser, 
 
 ## Evaluation
 
-**Early results** (small samples, September 2026, free-tier Gemini; a full `cotutor eval` suite is in progress):
+The [evaluation suite](backend/evals/README.md) scores runs against independent ground truth: hand-written golden solutions with hidden tests for 55 famous problems and **16 original problems** (novel wording and twists, two with no examples), so the models can't just recall an answer.
+
+**Early results** (September 2026, free-tier Gemini):
 
 | Check | Result |
 |---|---|
-| Library lessons verified (12 problems: arrays, strings, DP, graphs, linked lists, trees) | 12 / 12 |
+| Recorded lessons correct on hidden golden tests (49 problems) | 49 / 49; no false verifications |
 | Problem reconstructed from its name alone, with the exact LeetCode signature ([`evals/name_recognition.py`](backend/evals/name_recognition.py), 20 Blind 75 / NeetCode 150 problems) | 20 / 20 |
 | Cost of a new lesson (median) | 6.5 LLM calls · ~7.7k tokens · ~25 s |
 
@@ -178,10 +182,9 @@ Metrics the full suite will report:
 - [x] In-browser Pyodide sandbox with timeout recovery
 - [x] Guided and Walkthrough lessons, trace-driven visualizer, step counts per line
 - [x] Health-aware model router for free-tier reliability
-- [ ] Evaluation suite with published results
 - [x] Blind 75 and NeetCode 150 roadmaps with spaced-repetition review
-- [x] Design problems (a class with a sequence of method calls)
-- [ ] Graph nodes, cycles, random pointers and round-trip codecs (6 roadmap problems)
+- [x] Design problems, graph nodes, cyclic and random-pointer lists, round-trip codecs (all 151 roadmap problems)
+- [x] Evaluation suite with famous and novel problem sets
 - [ ] Practice mode: write your own solution, get the smallest failing input and a hint
 
 ## License

@@ -3,9 +3,16 @@
 The pipeline marks its own solutions as *verified*. An evaluation can't rely on that, so it
 scores every run against **independent ground truth**.
 
-## Golden set
+## Problem sets
 
-[`golden.py`](golden.py) has 49 Blind 75 / NeetCode 150 problems. Each one includes:
+- **Famous** ([`golden.py`](golden.py)): 55 Blind 75 / NeetCode 150 problems, run from their names
+  as roadmap lessons are. The models have seen these many times, so this is a best case.
+- **Novel** ([`novel.py`](novel.py)): 16 original problems with new wording and twists, given as
+  pasted statements. They include two statements with no examples, a multi-answer problem judged
+  by a checker, two design classes, a linked list and a tree. This set is the honest test of
+  whether the pipeline handles problems it can't recall.
+
+Each problem includes:
 
 - a hand-written, known-correct solution
 - hidden test inputs chosen to break wrong solutions (empty inputs, duplicates, negatives, boundaries, ties)
@@ -32,7 +39,8 @@ known answers and run every hidden case.
 
 ```bash
 uv run python -m evals.run                       # score recorded lessons (free; survivorship-biased)
-uv run python -m evals.run --live                # fresh runs of all 49 problems from their names
+uv run python -m evals.run --live                # fresh runs of the famous set, from names
+uv run python -m evals.run --live --set novel    # fresh runs of the original problems
 uv run python -m evals.run --live --no-debug     # ablation: no debug loop
 ```
 
