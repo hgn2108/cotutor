@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import agents
+from ..complexity import EXPONENTIAL, expected_slope
 from ..complexity import check as check_complexity
 from ..llm import LLMError
 from ..runtime.harness import fit_slope
@@ -73,22 +74,38 @@ class Profiler:
             feedback = (
                 f"Your reference solution is not naive: measured step counts grow like n^{ref:.1f}, "
                 f"the same as the optimized solution ({solution.approach}). Write a brute force that "
-                "enumerates candidates directly, without that technique. Keep the same generator "
-                "and checker behaviour."
+                "enumerates candidates directly, without that technique, and make sure the generators' "
+                "n scales the input dimension that dominates its running time."
             )
             try:
                 retry, u = await agents.design_tests(self.ctx.llm, spec, feedback)
                 st.usage(u)
+                ref2 = await self.step_growth(spec, retry.reference_solution,
+                                              retry.generator_code or plan.generator_code)
             except LLMError:
-                return ReferenceCheck(plan, True)
-            ref2 = await self.step_growth(spec, retry.reference_solution,
-                                          retry.generator_code or plan.generator_code)
-            if ref2 is not None and ref2 >= sol + 0.5:
+                retry, ref2 = None, None
+            if retry is not None and ref2 is not None and ref2 >= sol + 0.5:
                 st.note(f"Rewrote the brute force: it now grows like n^{ref2:.1f} vs n^{sol:.1f}.")
                 await self.ctx.artifact("test_plan", retry.model_dump())
                 return ReferenceCheck(retry, False)
+            if self._claims_disagree(plan, solution):
+                # The claims say the brute force is much slower but the counts don't show it: the
+                # generator's n likely doesn't grow the dimension that matters. Never tell learners
+                # "the direct approach is optimal" based on a measurement on the wrong axis.
+                st.note(f"Inconclusive: the brute force claims {plan.reference_time_complexity} vs "
+                        f"{solution.time_complexity}, but measured growth matches; the input "
+                        "generator likely doesn't scale the dominant dimension.", "warning")
+                return ReferenceCheck(plan, False)
             st.note("No slower straightforward approach exists; the direct approach is already optimal.")
             return ReferenceCheck(plan, True)
+
+    @staticmethod
+    def _claims_disagree(plan: TestPlan, solution: Solution) -> bool:
+        ref_claim = expected_slope(plan.reference_time_complexity)
+        sol_claim = expected_slope(solution.time_complexity)
+        if ref_claim == EXPONENTIAL:
+            return sol_claim != EXPONENTIAL
+        return ref_claim is not None and sol_claim is not None and ref_claim >= sol_claim + 0.9
 
     async def growth_at_scale(self, spec: ProblemSpec, plan: TestPlan,
                               solution: Solution) -> dict[str, Any] | None:

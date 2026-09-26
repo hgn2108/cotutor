@@ -140,7 +140,15 @@ The server only orchestrates. Code execution happens in each visitor's browser, 
 
 ## Evaluation
 
-*(In progress: `cotutor eval` will publish these numbers per model.)*
+**Early results** (small samples, September 2026, free-tier Gemini; a full `cotutor eval` suite is in progress):
+
+| Check | Result |
+|---|---|
+| Library lessons verified (12 problems: arrays, strings, DP, graphs, linked lists, trees) | 12 / 12 |
+| Problem reconstructed from its name alone, with the exact LeetCode signature ([`evals/name_recognition.py`](backend/evals/name_recognition.py), 20 Blind 75 / NeetCode 150 problems) | 20 / 20 |
+| Cost of a new lesson (median) | 6.5 LLM calls · ~7.7k tokens · ~25 s |
+
+Metrics the full suite will report:
 
 | Metric | What it measures |
 |---|---|

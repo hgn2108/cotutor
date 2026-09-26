@@ -29,6 +29,7 @@ import traceback
 from contextlib import redirect_stdout
 
 SOLUTION_FILE = "<solution>"
+REFERENCE_FILE = "<reference>"
 MAX_STDOUT = 2000
 MAX_COLLECTION = 64
 
@@ -251,6 +252,39 @@ def format_error(exc):
 # --------------------------------------------------------------------------------------
 # Job kinds
 # --------------------------------------------------------------------------------------
+REFERENCE_STEP_CAP = 2_000_000  # ~1-2s of Python; brute force beyond this is "too slow to consult"
+
+
+class _StepCap(Exception):
+    pass
+
+
+def with_step_cap(fn, *args, filename, cap):
+    """Run ``fn(*args)``, raising _StepCap once code from ``filename`` executes ``cap`` lines.
+
+    Used for the brute-force oracle: an exponential reference on a large input must not hang
+    the whole job (and get blamed on the solution). Python can't be interrupted from outside
+    inside Pyodide, but a trace function can stop it from the inside.
+    """
+    steps = 0
+
+    def tracer(frame, event, arg):
+        nonlocal steps
+        if frame.f_code.co_filename != filename:
+            return None
+        if event == "line":
+            steps += 1
+            if steps >= cap:
+                raise _StepCap()
+        return tracer
+
+    sys.settrace(tracer)
+    try:
+        return fn(*args)
+    finally:
+        sys.settrace(None)
+
+
 def job_tests(job, emit):
     spec = job["spec"]
     params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
@@ -260,10 +294,11 @@ def job_tests(job, emit):
     ref = None
     if job.get("reference_code"):
         try:
-            ref = resolve_callable(load_namespace(job["reference_code"], "<reference>"), spec["entry"])
+            ref = resolve_callable(load_namespace(job["reference_code"], REFERENCE_FILE), spec["entry"])
         except Exception as exc:  # a broken reference must not break the run
             emit({"ev": "reference_error", "error": format_error(exc)})
 
+    ref_cap = job.get("reference_step_cap", REFERENCE_STEP_CAP)
     results = []
     for case in job["cases"]:
         emit({"ev": "case_start", "id": case["id"]})
@@ -273,8 +308,12 @@ def job_tests(job, emit):
             expected_source = "none"
             if ref is not None:
                 try:
-                    expected, _ = call(ref, case["args"], params, in_place, ret)
+                    expected, _ = with_step_cap(call, ref, case["args"], params, in_place, ret,
+                                                filename=REFERENCE_FILE, cap=ref_cap)
                     expected_source = "reference"
+                except _StepCap:
+                    # Too big for the brute force: still check the solution runs, and fast.
+                    emit({"ev": "reference_too_slow", "id": case["id"]})
                 except Exception as exc:
                     emit({"ev": "reference_error", "id": case["id"], "error": format_error(exc)})
         start = time.perf_counter()
@@ -282,11 +321,17 @@ def job_tests(job, emit):
         try:
             got, out = call(fn, case["args"], params, in_place, ret)
             res.update(got=got, stdout=out)
-            if expected_source == "none" and checker is None:
-                res["status"] = "ran"
-            else:
+            if expected_source != "none":
                 ok = judge(checker, case["args"], got, expected, comparison)
                 res["status"] = "pass" if ok else "fail"
+            elif checker is not None:
+                # No expected value, but a checker can still validate the answer directly.
+                try:
+                    res["status"] = "pass" if checker(copy.deepcopy(case["args"]), got, None) else "fail"
+                except Exception:
+                    res["status"] = "ran"
+            else:
+                res["status"] = "ran"  # nothing trustworthy to compare against
         except Exception as exc:
             res.update(status="error", error=format_error(exc))
         res["ms"] = round((time.perf_counter() - start) * 1000, 3)
@@ -300,21 +345,23 @@ def job_differential(job, emit):
     params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
     ret = spec.get("return_type", "")
     fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
-    ref = resolve_callable(load_namespace(job["reference_code"], "<reference>"), spec["entry"])
+    ref = resolve_callable(load_namespace(job["reference_code"], REFERENCE_FILE), spec["entry"])
     checker = load_checker(job)
     generate = load_namespace(job["generator_code"], "<generator>")["generate"]
     rng = random.Random(job.get("seed", 0))
     sizes = job.get("sizes") or [1, 2, 3, 5, 8]
     budget = job.get("budget_s", 3.0)
     deadline = time.perf_counter() + budget
+    ref_cap = job.get("reference_step_cap", REFERENCE_STEP_CAP)
     trials = ref_errors = 0
     for i in range(job.get("trials", 200)):
         if time.perf_counter() > deadline:
             break
         args = generate(rng, sizes[i % len(sizes)])
         try:
-            expected, _ = call(ref, args, params, in_place, ret)
-        except Exception:
+            expected, _ = with_step_cap(call, ref, args, params, in_place, ret,
+                                        filename=REFERENCE_FILE, cap=ref_cap)
+        except Exception:  # includes _StepCap: skip inputs the brute force can't finish
             ref_errors += 1
             continue
         trials += 1
@@ -519,10 +566,6 @@ def job_line_counts(job, emit):
         if capped:
             break
     return {"runs": runs, "used_worst_case": generate is gen_ns.get("generate_worst")}
-
-
-class _StepCap(Exception):
-    pass
 
 
 def _count_lines(fn, args, cap):

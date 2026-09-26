@@ -35,7 +35,7 @@ function StepGrowth({ solution, brute }: { solution: LineCountRun[]; brute?: Lin
             <path d={s.runs.map((r, k) => `${k ? 'L' : 'M'}${sx(r.n)},${sy(r.total)}`).join('')} fill="none" className={s.cls} strokeWidth={2.4} strokeLinejoin="round" />
             {s.runs.map((r) => <circle key={r.n} cx={sx(r.n)} cy={sy(r.total)} r={3.5} className={clsx('stroke-panel', s.fill)} strokeWidth={1.5} />)}
             {s.runs.length > 0 && (
-              <text x={sx(s.runs.at(-1)!.n) + 8} y={sy(s.runs.at(-1)!.total) + 4} className={clsx('font-mono text-[11px] font-semibold', s.fill)}>{s.runs.at(-1)!.total.toLocaleString()}</text>
+              <text x={sx(s.runs.at(-1)!.n) + 8} y={sy(s.runs.at(-1)!.total) + 4} className={clsx('font-mono text-[11px] font-semibold', s.fill)}>{s.runs.at(-1)!.capped ? '≥' : ''}{s.runs.at(-1)!.total.toLocaleString()}</text>
             )}
           </g>
         ))}
@@ -47,7 +47,7 @@ function StepGrowth({ solution, brute }: { solution: LineCountRun[]; brute?: Lin
             <span key={s.name} className="flex items-center gap-1.5">
               <span className={clsx('h-0.5 w-4 rounded', s.cls.replace('stroke', 'bg'))} />
               <span className="text-muted">{s.name}:</span>
-              <span className="font-mono">{s.runs.map((x) => x.total.toLocaleString()).join(' → ')} steps</span>
+              <span className="font-mono">{s.runs.map((x) => `${x.capped ? '≥' : ''}${x.total.toLocaleString()}`).join(' → ')} steps</span>
               {r && <Badge tone={r > 3 ? 'warn' : 'ok'} className="font-mono">×{r.toFixed(1)} per doubling</Badge>}
             </span>
           )

@@ -126,8 +126,28 @@ async def test_problem_without_slower_approach_is_flagged():
         "        if target - x in seen:\n"
         "            return [seen[target - x], i]\n"
         "        seen[x] = i\n")})
+    optimal_ref = optimal_ref.model_copy(update={"reference_time_complexity": "O(n)"})  # honest claim
     script["test_designer"] = [optimal_ref, optimal_ref]
     _, events, llm = await run_pipeline(script)
     intro = artifacts(events, "lesson_intro")[0]
     assert intro["brute_is_optimal"] is True and intro["bottleneck_line"] is None
     assert "already grows as slowly" in llm.calls["coach_intro"][0]
+
+
+async def test_claimed_exponential_brute_force_is_not_called_optimal():
+    """If counts look equal but the brute force claims exponential time, the measurement is on
+    the wrong axis: never tell learners the direct approach is optimal."""
+    script = two_sum_script()
+    looks_linear = script["test_designer"][0].model_copy(update={
+        "reference_time_complexity": "O(2^n)",
+        "reference_solution": script["solver"][0].code.replace("class Solution:\n", "").replace(
+            "    def twoSum(self, nums, target):", "def twoSum(nums, target):").replace("\n    ", "\n"),
+    })
+    script["test_designer"] = [looks_linear, looks_linear]  # the retry doesn't help either
+    _, events, llm = await run_pipeline(script)
+    intro = artifacts(events, "lesson_intro")[0]
+    assert intro["brute_is_optimal"] is False
+    assert len(llm.calls["test_designer"]) == 2
+    note = next(e for e in events if e["type"] == "stage" and e["id"] == "naive_check"
+                and e["status"] != "running")["detail"]
+    assert note.startswith("Inconclusive")

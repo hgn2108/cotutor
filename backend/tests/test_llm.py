@@ -1,5 +1,6 @@
 """The Gemini client routes around overloaded models."""
 
+import asyncio
 from types import SimpleNamespace
 
 import httpx
@@ -14,13 +15,16 @@ OK = Param(name="x", type="int")
 
 class FakeGemini(GeminiClient):
     def __init__(self, behavior: dict[str, list], rounds: int = 2):
-        super().__init__("test-key", ["smart-a", "smart-b"], ["fast-a"], rounds=rounds, base_delay_s=0)
+        super().__init__("test-key", ["smart-a", "smart-b"], ["fast-a"], rounds=rounds, base_delay_s=0,
+                         request_timeout_s=0.05)
         self.behavior = behavior
         self.calls: list[str] = []
 
     async def _call(self, model, prompt, config):
         self.calls.append(model)
         outcome = self.behavior[model].pop(0)
+        if outcome == "hang":
+            await asyncio.sleep(10)
         if isinstance(outcome, Exception):
             raise outcome
         if isinstance(outcome, int):
@@ -69,4 +73,10 @@ async def test_gives_up_when_every_model_stays_down():
 async def test_dropped_connection_fails_over():
     llm = FakeGemini({"smart-a": [httpx.RemoteProtocolError("disconnected")], "smart-b": [OK]})
     value, usage = await llm.structured(agent="t", system="", prompt="", schema=Param)
+    assert usage.model == "smart-b"
+
+
+async def test_hung_request_times_out_and_fails_over():
+    llm = FakeGemini({"smart-a": ["hang"], "smart-b": [OK]})
+    _, usage = await llm.structured(agent="t", system="", prompt="", schema=Param)
     assert usage.model == "smart-b"

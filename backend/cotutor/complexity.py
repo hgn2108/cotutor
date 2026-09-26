@@ -20,8 +20,15 @@ _CLASSES: list[tuple[re.Pattern[str], float]] = [
 ]
 
 
+EXPONENTIAL = 99.0  # stands in for "grows faster than any polynomial"
+_EXPONENTIAL = re.compile(r"(\d|[a-z)])\^\(?[a-z]|[a-z]!|\bfactorial|exponential|[²³]?ⁿ")
+
+
 def expected_slope(claim: str) -> float | None:
+    """Log-log slope a claimed Big-O implies on doubling n; EXPONENTIAL for 2^n, k^n, n!."""
     norm = re.sub(r"\s+", "", claim.lower()).replace("·", "*")
+    if _EXPONENTIAL.search(norm):
+        return EXPONENTIAL
     for pattern, slope in _CLASSES:
         if pattern.match(norm):
             return slope
@@ -42,6 +49,10 @@ def check(claimed: str, measured: float | None, tolerance: float = 0.4) -> Compl
     if measured is None:
         return ComplexityCheck(claimed, None, exp, "inconclusive",
                                "Runs were too fast to time reliably.")
+    if exp == EXPONENTIAL:
+        return ComplexityCheck(claimed, measured, None, "inconclusive",
+                               f"Measured growth ≈ n^{measured:.2f}; exponential claims can't be "
+                               "checked with a polynomial fit.")
     if exp is None:
         return ComplexityCheck(claimed, measured, None, "inconclusive",
                                f"Measured growth ≈ n^{measured:.2f}; claim is multi-variable "

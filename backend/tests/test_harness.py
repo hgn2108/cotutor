@@ -77,3 +77,33 @@ def test_capped_generator_does_not_fake_a_flat_growth_rate():
     res = run({"kind": "complexity", "spec": spec, "code": quadratic, "generator_code": capped})
     assert "stopped growing" in res["stopped"]
     assert all(n <= 512 for n, _ in res["points"])
+
+
+def test_slow_brute_force_does_not_hang_or_blame_the_solution():
+    spec = {"entry": "coinChange", "params": [{"name": "coins", "type": "List[int]"},
+                                              {"name": "amount", "type": "int"}],
+            "return_type": "int", "comparison": "exact"}
+    exponential_ref = (
+        "def coinChange(coins, amount):\n"
+        "    def go(rem):\n"
+        "        if rem == 0: return 0\n"
+        "        if rem < 0: return -1\n"
+        "        best = -1\n"
+        "        for c in coins:\n"
+        "            r = go(rem - c)\n"
+        "            if r >= 0 and (best < 0 or r + 1 < best): best = r + 1\n"
+        "        return best\n"
+        "    return go(amount)\n")
+    dp = ("def coinChange(coins, amount):\n"
+          "    INF = amount + 1\n    best = [0] + [INF] * amount\n"
+          "    for a in range(1, amount + 1):\n"
+          "        for c in coins:\n"
+          "            if c <= a: best[a] = min(best[a], best[a - c] + 1)\n"
+          "    return -1 if best[amount] == INF else best[amount]\n")
+    res = run({"kind": "tests", "spec": spec, "code": dp, "reference_code": exponential_ref,
+               "reference_step_cap": 200_000,
+               "cases": [{"id": "small", "args": [[1, 2, 5], 11]},
+                         {"id": "huge", "args": [[1, 2, 5], 300]}]})
+    by_id = {c["id"]: c for c in res["cases"]}
+    assert by_id["small"]["status"] == "pass" and by_id["small"]["expected"] == 3
+    assert by_id["huge"]["status"] == "ran" and by_id["huge"]["expected_source"] == "none"

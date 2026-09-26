@@ -62,6 +62,9 @@ class TestPlan(BaseModel):
         description="Brute-force Python solution that is obviously correct, even if slow. "
         "Must define a top-level function with the entry name."
     )
+    reference_time_complexity: str = Field(
+        description="Big-O of the brute force in terms of the generators' n, e.g. 'O(n^2)', 'O(2^n)'."
+    )
     generator_code: str = Field(
         description="Python defining generate(rng, n) -> list of args (random valid input of "
         "size n) and generate_worst(rng, n) -> list of args (worst case for runtime)."

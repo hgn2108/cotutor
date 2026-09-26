@@ -51,6 +51,7 @@ PLAN = TestPlan(
         "            if nums[i] + nums[j] == target:\n"
         "                return [i, j]\n"
     ),
+    reference_time_complexity="O(n^2)",
     generator_code=(
         "def generate(rng, n):\n"
         "    n = max(2, n)\n"

@@ -55,13 +55,15 @@ class GeminiClient:
     _cooling_until: dict[str, float] = {}  # shared across instances on purpose
 
     def __init__(self, api_key: str, smart_models: list[str], fast_models: list[str],
-                 rounds: int = 3, base_delay_s: float = 3.0):
+                 rounds: int = 3, base_delay_s: float = 3.0, request_timeout_s: float = 45.0):
         from google import genai  # imported lazily so tests don't need credentials
 
         self._client = genai.Client(api_key=api_key)
         self._models = {"smart": smart_models, "fast": fast_models}
         self._rounds = rounds
         self._delay = base_delay_s
+        # Under load a request can hang for minutes; better to fail fast and try another model.
+        self._timeout = request_timeout_s
 
     async def _call(self, model: str, prompt: str, config):
         return await self._client.aio.models.generate_content(model=model, contents=prompt, config=config)
@@ -87,7 +89,7 @@ class GeminiClient:
             for model in self._ordered(self._models[tier]):
                 start = time.perf_counter()
                 try:
-                    resp = await self._call(model, prompt, config)
+                    resp = await asyncio.wait_for(self._call(model, prompt, config), self._timeout)
                     parsed = resp.parsed if isinstance(resp.parsed, schema) else None
                     if parsed is None:
                         parsed = schema.model_validate_json(resp.text or "")
