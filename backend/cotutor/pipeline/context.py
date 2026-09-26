@@ -107,6 +107,7 @@ def harness_spec(spec: ProblemSpec) -> dict[str, Any]:
     """The subset of the spec the execution harness needs."""
     return {
         "entry": spec.entry,
+        "kind": spec.kind,
         "params": [p.model_dump() for p in spec.params],
         "comparison": spec.comparison,
         "return_type": spec.return_type,

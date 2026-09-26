@@ -81,11 +81,12 @@ def roadmap_jobs(roadmap: str, ids: list[str]):
     """Supported roadmap problems without a recording (library matches already have one)."""
     for item in library.roadmaps()["problems"]:
         out = ROADMAP_DIR / f"{item['id']}.json"
-        if (roadmap not in item["roadmaps"] or item["kind"] != "function"
+        if (roadmap not in item["roadmaps"] or item["kind"] == "special"
                 or library.library_match(item["title"]) or (ids and item["id"] not in ids)
                 or (not ids and out.exists())):
             continue
-        known = KnownProblem(item["entry"], tuple(item["params"]))
+        known = (KnownProblem(item["class_name"]) if item["kind"] == "design"
+                 else KnownProblem(item["entry"], tuple(item["params"])))
         yield f"{item['number']}. {item['title']}", library.name_prompt(item), known, out
 
 

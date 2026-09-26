@@ -24,6 +24,12 @@ EXPONENTIAL = 99.0  # stands in for "grows faster than any polynomial"
 _EXPONENTIAL = re.compile(r"(\d|[a-z)])\^\(?[a-z]|[a-z]!|\bfactorial|exponential|[²³]?ⁿ")
 
 
+def _first_big_o(claim: str) -> str:
+    """'O(1) per get and put' -> 'O(1)'."""
+    m = re.search(r"O\((?:[^()]|\([^()]*\))*\)", claim)
+    return m.group(0) if m else claim
+
+
 def normalize_claim(claim: str) -> str:
     return re.sub(r"[\s*·×]", "", claim.lower())
 
@@ -48,8 +54,13 @@ class ComplexityCheck:
     note: str
 
 
-def check(claimed: str, measured: float | None, tolerance: float = 0.4) -> ComplexityCheck:
-    exp = expected_slope(claimed)
+def check(claimed: str, measured: float | None, tolerance: float = 0.4,
+          per_operation: bool = False) -> ComplexityCheck:
+    """``per_operation``: the claim is per call (design problems) while timing covers n calls,
+    so the total grows one power of n faster than the claim."""
+    exp = expected_slope(_first_big_o(claimed) if per_operation else claimed)
+    if per_operation and exp is not None and exp != EXPONENTIAL:
+        exp += 1.0
     if measured is None:
         return ComplexityCheck(claimed, None, exp, "inconclusive",
                                "Runs were too fast to time reliably.")

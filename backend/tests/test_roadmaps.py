@@ -41,7 +41,10 @@ def test_session_resolves_roadmap_refs():
     problem, known = resolve({"ref": "koko-eating-bananas"})
     assert problem.startswith("LeetCode 875: Koko Eating Bananas")
     assert known == KnownProblem("minEatingSpeed", ("piles", "h"))
-    assert "aren't supported yet" in resolve({"ref": "lru-cache"})
+    # Design problems start from the class name.
+    assert resolve({"ref": "lru-cache"}) == ("LeetCode 146: LRU Cache\nClass: LRUCache",
+                                             KnownProblem("LRUCache"))
+    assert "aren't supported yet" in resolve({"ref": "clone-graph"})
     assert resolve({"ref": "nope"}) == "Unknown roadmap problem."
 
 

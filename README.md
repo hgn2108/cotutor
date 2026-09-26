@@ -56,7 +56,7 @@ Pick a roadmap and work through it pattern by pattern. Progress, quiz scores and
 - **No problem statements are stored or scraped.** Each lesson starts from the problem's number, title and function signature. The Analyst restates the problem in its own Input / Output / Rules format and links to the original on LeetCode, where you can submit your own solution.
 - **The right problem, verified.** The stored signature is checked against the Analyst's reconstruction before anything is taught; on a mismatch Cotutor asks you to paste the statement instead. In testing, 20 of 20 problems were reconstructed exactly from their names.
 - **Instant lessons.** Recorded lessons replay immediately for everyone; the rest are generated (about 25 s) and cached.
-- **Coverage.** 135 of 151 problems are supported today; design problems (LRU Cache, Min Stack, Trie, …) and four that need special node structures are coming.
+- **Coverage.** 145 of 151 problems, including design problems (LRU Cache, Min Stack, Trie, …) replayed through LeetCode's operation-sequence format. Six that need graph nodes, cycles, random pointers or round-trip codecs are coming.
 
 Lists: [NeetCode 150](https://neetcode.io/practice) by NeetCode and the original [Blind 75](https://www.teamblind.com/post/New-Year-Gift---Curated-List-of-Top-75-LeetCode-Questions-to-Save-Your-Time-OaM1orEU). Problems belong to LeetCode.
 
@@ -178,7 +178,8 @@ Metrics the full suite will report:
 - [x] Health-aware model router for free-tier reliability
 - [ ] Evaluation suite with published results
 - [x] Blind 75 and NeetCode 150 roadmaps with spaced-repetition review
-- [ ] Design problems (a class with a sequence of method calls)
+- [x] Design problems (a class with a sequence of method calls)
+- [ ] Graph nodes, cycles, random pointers and round-trip codecs (6 roadmap problems)
 - [ ] Practice mode: write your own solution, get the smallest failing input and a hint
 
 ## License

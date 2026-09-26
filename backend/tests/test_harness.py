@@ -119,3 +119,80 @@ def test_trace_of_a_big_grid_stays_browser_sized():
     res = run({"kind": "trace", "spec": spec, "code": code, "args": [grid], "max_bytes": 200_000})
     assert res["ok"] and res["truncated"]
     assert len(json.dumps(res)) < 400_000
+
+
+LRU_SPEC = {"entry": "LRUCache", "kind": "design", "comparison": "exact", "return_type": "",
+            "params": [{"name": "operations", "type": "List[str]"},
+                       {"name": "arguments", "type": "List[List]"}]}
+LRU = """
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.cache = OrderedDict()
+
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        self.cache.move_to_end(key)
+        return self.cache[key]
+
+    def put(self, key, value):
+        self.cache[key] = value
+        self.cache.move_to_end(key)
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)
+"""
+LRU_NAIVE = """
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity, self.items = capacity, []   # [key, value], least recent first
+
+    def get(self, key):
+        for i, (k, v) in enumerate(self.items):
+            if k == key:
+                self.items.append(self.items.pop(i))
+                return v
+        return -1
+
+    def put(self, key, value):
+        self.items = [kv for kv in self.items if kv[0] != key] + [[key, value]]
+        if len(self.items) > self.capacity:
+            self.items.pop(0)
+"""
+LRU_GEN = """
+def generate(rng, n):
+    ops, args = ["LRUCache"], [[rng.randint(1, 4)]]
+    for _ in range(n):
+        if rng.random() < 0.5:
+            ops.append("put"); args.append([rng.randint(1, 6), rng.randint(0, 99)])
+        else:
+            ops.append("get"); args.append([rng.randint(1, 6)])
+    return [ops, args]
+"""
+LEETCODE_EXAMPLE = [["LRUCache", "put", "put", "get", "put", "get", "put", "get", "get", "get"],
+                    [[2], [1, 1], [2, 2], [1], [3, 3], [2], [4, 4], [1], [3], [4]]]
+
+
+def test_design_problem_replays_operation_sequences():
+    res = run({"kind": "tests", "spec": LRU_SPEC, "code": LRU, "reference_code": LRU_NAIVE,
+               "cases": [{"id": "ex", "args": LEETCODE_EXAMPLE,
+                          "expected": [None, None, None, 1, None, -1, None, -1, 3, 4]},
+                         {"id": "gen", "args": [["LRUCache", "put", "get"], [[1], [5, 5], [5]]]}]})
+    assert [c["status"] for c in res["cases"]] == ["pass", "pass"]
+    assert res["cases"][1]["expected"] == [None, None, 5]
+
+
+def test_design_differential_catches_a_broken_eviction():
+    broken = LRU.replace("self.cache.move_to_end(key)\n        return", "return")  # get() forgets recency
+    res = run({"kind": "differential", "spec": LRU_SPEC, "code": broken, "reference_code": LRU_NAIVE,
+               "generator_code": LRU_GEN, "sizes": [6, 10, 16], "trials": 300})
+    assert res["counterexample"] is not None
+
+
+def test_design_trace_shows_object_fields_and_counts_work():
+    res = run({"kind": "trace", "spec": LRU_SPEC, "code": LRU, "args": LEETCODE_EXAMPLE})
+    assert res["result"] == [None, None, None, 1, None, -1, None, -1, 3, 4]
+    assert any("self.cache" in s["locals"] for s in res["steps"])
+    counts = run({"kind": "line_counts", "spec": LRU_SPEC, "code": LRU, "generator_code": LRU_GEN,
+                  "sizes": [8, 16, 32]})
+    assert counts["ok"] and len(counts["runs"]) == 3

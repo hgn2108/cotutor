@@ -133,7 +133,7 @@
    "title": "Encode and Decode Strings",
    "difficulty": "medium",
    "category": "Arrays & Hashing",
-   "kind": "design",
+   "kind": "special",
    "class_name": "Codec",
    "roadmaps": [
     "neetcode150",
@@ -1090,7 +1090,7 @@
    "title": "Serialize and Deserialize Binary Tree",
    "difficulty": "hard",
    "category": "Trees",
-   "kind": "design",
+   "kind": "special",
    "class_name": "Codec",
    "roadmaps": [
     "neetcode150",

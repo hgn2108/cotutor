@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..llm import LLMClient, Usage
 from ..schemas import ProblemSpec
-from .common import PYTHON_ENV_NOTE
+from .common import DESIGN_NOTE, PYTHON_ENV_NOTE
 
 
 async def analyze(llm: LLMClient, problem: str) -> tuple[ProblemSpec, Usage]:
@@ -18,7 +18,7 @@ async def analyze(llm: LLMClient, problem: str) -> tuple[ProblemSpec, Usage]:
         "shape; never reproduce the original statement's phrasing, story or character names. "
         "Every example's expected output must be "
         "exactly right: prefer small "
-        "examples you can verify by hand. " + PYTHON_ENV_NOTE
+        "examples you can verify by hand. " + DESIGN_NOTE + " " + PYTHON_ENV_NOTE
     )
     return await llm.structured(
         agent="analyst", system=system, prompt=f"Problem statement:\n{problem}",

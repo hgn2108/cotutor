@@ -149,7 +149,7 @@ export function RoadmapsPage({ data, error, roadmap, setRoadmap, progress, impor
       </div>
       <p className="mt-6 text-center text-[11.5px] leading-relaxed text-faint">
         Progress is saved in this browser only. Lesson content is generated and verified by Cotutor; problem statements belong to LeetCode.<br />
-        Design problems (e.g. LRU Cache) and a few with special node structures are coming soon.
+        A few problems that need special structures (graph nodes, cycles, random pointers, round-trip codecs) are coming soon.
       </p>
     </Shell>
   )
@@ -176,7 +176,7 @@ function Row({ p, status, onStart }: { p: RoadmapProblem; status: ItemStatus; on
           {status === 'new' ? 'Learn' : status === 'due' ? 'Review' : 'Revisit'}
         </Button>
       ) : (
-        <span className="w-[62px] text-right text-[11px] text-faint" title={p.kind === 'design' ? 'Design problems (a class with several methods) are coming soon' : 'Needs node structures not supported yet'}>soon</span>
+        <span className="w-[62px] text-right text-[11px] text-faint" title="Needs structures not supported yet (cycles, random pointers, graph nodes, round-trip codecs)">soon</span>
       )}
       <a href={p.url} target="_blank" rel="noreferrer" className="rounded p-1 text-faint hover:text-ink" aria-label={`${p.title} on LeetCode`} title="Open on LeetCode">
         <ExternalLink className="size-3.5" />

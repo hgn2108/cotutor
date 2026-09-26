@@ -78,8 +78,23 @@ export function Prose({ children, className }: { children: ReactNode; className?
   return <p className={clsx('text-[14px] leading-relaxed text-ink/90', className)}>{children}</p>
 }
 
-/** Render call arguments with their parameter names: `nums = [2, 7], target = 9`. */
+/** Render call arguments with their parameter names: `nums = [2, 7], target = 9`.
+ *  Design problems read as a call sequence: `LRUCache(2) → put(1, 1) → get(1)`. */
 export function ArgsInline({ args, spec }: { args: Json[]; spec?: ProblemSpec }) {
+  if (spec?.kind === 'design' && Array.isArray(args[0]) && Array.isArray(args[1])) {
+    const ops = args[0] as Json[], opArgs = args[1] as Json[]
+    return (
+      <span className="font-mono text-[12.5px]">
+        {ops.map((op, k) => (
+          <span key={k}>
+            {k > 0 && <span className="text-faint"> → </span>}
+            <span className={k === 0 ? 'font-semibold' : ''}>{String(op)}</span>
+            <span className="text-muted">({Array.isArray(opArgs[k]) ? (opArgs[k] as Json[]).map((a) => formatJson(a, 30)).join(', ') : ''})</span>
+          </span>
+        ))}
+      </span>
+    )
+  }
   return (
     <span className="font-mono text-[12.5px]">
       {args.map((a, k) => (

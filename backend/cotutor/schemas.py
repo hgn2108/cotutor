@@ -27,10 +27,14 @@ class Example(BaseModel):
 class ProblemSpec(BaseModel):
     is_solvable: bool = Field(description="False if the input is not a well-defined coding problem.")
     title: str
+    kind: Literal["function", "design"] = Field(description=(
+        "'design' when the task is to implement a class whose methods are called in sequence "
+        "(LRU Cache, Min Stack, Trie...); otherwise 'function'."))
     summary: str = Field(description=(
         "Restatement in exactly this shape, each on its own line: 'Input: ...', 'Output: ...', "
         "then 'Rules: ...' for any constraint that matters. Plain words, no story."))
-    entry: str = Field(description="Function/method name, LeetCode style (e.g. 'twoSum').")
+    entry: str = Field(description="Function/method name, LeetCode style (e.g. 'twoSum'); for "
+                       "design problems, the class name (e.g. 'LRUCache').")
     params: list[Param]
     return_type: str
     examples: list[Example] = Field(description="2-4 examples with verified expected outputs.")

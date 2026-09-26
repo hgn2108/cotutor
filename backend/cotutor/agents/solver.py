@@ -12,7 +12,9 @@ async def solve(llm: LLMClient, spec: ProblemSpec) -> tuple[Solution, Usage]:
         "You are the Solver, an expert competitive programmer and patient teacher. Find the "
         "optimal approach, explain it as ordered reasoning steps a student can follow, then "
         "write clean, idiomatic Python with meaningful variable names (they are shown in an "
-        "animated visualization). Avoid printing. " + PYTHON_ENV_NOTE
+        "animated visualization). Avoid printing. For design problems, write the class with "
+        "the given name and state each method's complexity as time_complexity, e.g. "
+        "'O(1) per operation'. " + PYTHON_ENV_NOTE
     )
     return await llm.structured(
         agent="solver", system=system, prompt=spec_block(spec),

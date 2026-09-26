@@ -29,6 +29,9 @@ async def design_tests(
         "coin change, the string length for substrings, the node count for trees), because growth "
         "is measured against n. Never cap or clamp n: the profiler calls "
         "these with n up to 1,000,000, and inputs must keep growing with n.\n"
+        "For design problems: every input is an [operations, arguments] pair, the reference is "
+        "a naive class with the same name (e.g. plain lists and linear scans), and generate(rng, "
+        "n) returns a pair with n method calls after the constructor.\n"
         "4. If the problem accepts more than one correct output, check(args, got, expected) "
         "that validates `got` directly against the problem rules (do not just compare to "
         "`expected`). Otherwise return an empty string.\n" + PYTHON_ENV_NOTE

@@ -28,7 +28,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (1, "Two Sum", E, "twoSum(nums, target)", True, "function"),
         (49, "Group Anagrams", M, "groupAnagrams(strs)", True, "function"),
         (347, "Top K Frequent Elements", M, "topKFrequent(nums, k)", True, "function"),
-        (271, "Encode and Decode Strings", M, "Codec", True, "design"),
+        (271, "Encode and Decode Strings", M, "Codec", True, "special"),  # tested as a round trip
         (238, "Product of Array Except Self", M, "productExceptSelf(nums)", True, "function"),
         (36, "Valid Sudoku", M, "isValidSudoku(board)", False, "function"),
         (128, "Longest Consecutive Sequence", M, "longestConsecutive(nums)", True, "function"),
@@ -94,7 +94,7 @@ CATEGORIES: list[tuple[str, list[tuple]]] = [
         (230, "Kth Smallest Element in a BST", M, "kthSmallest(root, k)", True, "function"),
         (105, "Construct Binary Tree from Preorder and Inorder Traversal", M, "buildTree(preorder, inorder)", True, "function"),
         (124, "Binary Tree Maximum Path Sum", H, "maxPathSum(root)", True, "function"),
-        (297, "Serialize and Deserialize Binary Tree", H, "Codec", True, "design"),
+        (297, "Serialize and Deserialize Binary Tree", H, "Codec", True, "special"),  # round trip
     ]),
     ("Heap / Priority Queue", [
         (703, "Kth Largest Element in a Stream", E, "KthLargest", False, "design"),

@@ -229,17 +229,63 @@ def judge(checker, args, got, expected, comparison):
     return outputs_match(got, expected, comparison)
 
 
-def call(fn, args, params, in_place_arg, return_type=""):
-    """Run fn on a deep copy of args; returns (plain_output, stdout)."""
-    real_args = convert_args(copy.deepcopy(args), params)
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        result = fn(*real_args)
-    if in_place_arg is not None and in_place_arg >= 0:
-        result = real_args[in_place_arg]
-    if result is None and _kind(return_type) in ("listnode", "treenode"):
-        result = []  # an empty list/tree is None at runtime and [] in LeetCode's JSON
-    return to_plain(result), buf.getvalue()[:MAX_STDOUT]
+def run_design(cls, ops, op_args):
+    """Replay LeetCode's design-problem format: construct, then call methods in order.
+
+    ``[["LRUCache", "put", "get"], [[2], [1, 1], [1]]]`` -> ``[None, None, 1]``
+    """
+    if not ops:
+        return []
+    obj, out = cls(*op_args[0]), [None]
+    for op, args in zip(ops[1:], op_args[1:], strict=True):
+        out.append(to_plain(getattr(obj, op)(*args)))
+    return out
+
+
+class Runner:
+    """How to call a solution, whatever its shape.
+
+    A LeetCode function (or ``Solution`` method) is called with converted arguments; a design
+    class is replayed through an operation sequence. Every job kind goes through this, so they
+    all support both shapes.
+    """
+
+    def __init__(self, fn, spec):
+        self.fn = fn
+        self.params = spec.get("params", [])
+        self.in_place = spec.get("in_place_arg")
+        self.return_type = spec.get("return_type", "")
+        self.design = spec.get("kind") == "design"
+
+    def prepare(self, args):
+        """Fresh, converted arguments (callers may mutate them)."""
+        args = copy.deepcopy(args)
+        return args if self.design else convert_args(args, self.params)
+
+    def invoke(self, prepared):
+        if self.design:
+            return run_design(self.fn, *prepared)
+        return self.fn(*prepared)
+
+    def output(self, prepared, raw):
+        """Plain JSON-able result, honouring in-place problems and empty lists/trees."""
+        if not self.design and self.in_place is not None and self.in_place >= 0:
+            raw = prepared[self.in_place]
+        if raw is None and _kind(self.return_type) in ("listnode", "treenode"):
+            raw = []  # an empty list/tree is None at runtime and [] in LeetCode's JSON
+        return to_plain(raw)
+
+    def __call__(self, args):
+        """Run on a copy of ``args``; returns (plain_output, stdout)."""
+        prepared = self.prepare(args)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            raw = self.invoke(prepared)
+        return self.output(prepared, raw), buf.getvalue()[:MAX_STDOUT]
+
+
+def bind(code, spec, filename=SOLUTION_FILE):
+    return Runner(resolve_callable(load_namespace(code, filename), spec["entry"]), spec)
 
 
 def format_error(exc):
@@ -287,14 +333,13 @@ def with_step_cap(fn, *args, filename, cap):
 
 def job_tests(job, emit):
     spec = job["spec"]
-    params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
-    ret = spec.get("return_type", "")
-    fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
+    comparison = spec["comparison"]
+    run = bind(job["code"], spec)
     checker = load_checker(job)
     ref = None
     if job.get("reference_code"):
         try:
-            ref = resolve_callable(load_namespace(job["reference_code"], REFERENCE_FILE), spec["entry"])
+            ref = bind(job["reference_code"], spec, REFERENCE_FILE)
         except Exception as exc:  # a broken reference must not break the run
             emit({"ev": "reference_error", "error": format_error(exc)})
 
@@ -308,8 +353,7 @@ def job_tests(job, emit):
             expected_source = "none"
             if ref is not None:
                 try:
-                    expected, _ = with_step_cap(call, ref, case["args"], params, in_place, ret,
-                                                filename=REFERENCE_FILE, cap=ref_cap)
+                    expected, _ = with_step_cap(ref, case["args"], filename=REFERENCE_FILE, cap=ref_cap)
                     expected_source = "reference"
                 except _StepCap:
                     # Too big for the brute force: still check the solution runs, and fast.
@@ -319,7 +363,7 @@ def job_tests(job, emit):
         start = time.perf_counter()
         res = {"id": case["id"], "expected": expected, "expected_source": expected_source}
         try:
-            got, out = call(fn, case["args"], params, in_place, ret)
+            got, out = run(case["args"])
             res.update(got=got, stdout=out)
             if expected_source != "none":
                 ok = judge(checker, case["args"], got, expected, comparison)
@@ -342,10 +386,9 @@ def job_tests(job, emit):
 
 def job_differential(job, emit):
     spec = job["spec"]
-    params, comparison, in_place = spec["params"], spec["comparison"], spec.get("in_place_arg")
-    ret = spec.get("return_type", "")
-    fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
-    ref = resolve_callable(load_namespace(job["reference_code"], REFERENCE_FILE), spec["entry"])
+    comparison = spec["comparison"]
+    run = bind(job["code"], spec)
+    ref = bind(job["reference_code"], spec, REFERENCE_FILE)
     checker = load_checker(job)
     generate = load_namespace(job["generator_code"], "<generator>")["generate"]
     rng = random.Random(job.get("seed", 0))
@@ -359,15 +402,14 @@ def job_differential(job, emit):
             break
         args = generate(rng, sizes[i % len(sizes)])
         try:
-            expected, _ = with_step_cap(call, ref, args, params, in_place, ret,
-                                        filename=REFERENCE_FILE, cap=ref_cap)
+            expected, _ = with_step_cap(ref, args, filename=REFERENCE_FILE, cap=ref_cap)
         except Exception:  # includes _StepCap: skip inputs the brute force can't finish
             ref_errors += 1
             continue
         trials += 1
         emit({"ev": "trial", "n": trials})
         try:
-            got, _ = call(fn, args, params, in_place, ret)
+            got, _ = run(args)
         except Exception as exc:
             return {"trials": trials, "reference_errors": ref_errors,
                     "counterexample": {"args": args, "expected": expected, "error": format_error(exc)}}
@@ -402,9 +444,7 @@ def job_complexity(job, emit):
     Uses ``generate_worst`` when the generator defines it, since random inputs often let a
     solution exit early and hide its true growth rate.
     """
-    spec = job["spec"]
-    params = spec["params"]
-    fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
+    run = bind(job["code"], job["spec"])
     gen_ns = load_namespace(job["generator_code"], "<generator>")
     generate = _pick_generator(gen_ns, job)
     target_ms, max_n = job.get("target_ms", 60.0), job.get("max_n", 1 << 20)
@@ -423,10 +463,10 @@ def job_complexity(job, emit):
         try:
             for _ in range(job.get("repeats", 3)):
                 # Regenerate instead of deep-copying: copying a long ListNode chain recurses.
-                a = convert_args(generate(random.Random(seed + n), n), params)
+                a = run.prepare(generate(random.Random(seed + n), n))
                 t0 = time.perf_counter()
                 with redirect_stdout(io.StringIO()):
-                    fn(*a)
+                    run.invoke(a)
                 elapsed = (time.perf_counter() - t0) * 1000
                 best = elapsed if best is None else min(best, elapsed)
                 if best > target_ms:
@@ -485,9 +525,7 @@ def snapshot(value, depth=0):
 
 
 def job_trace(job, emit):
-    spec = job["spec"]
-    params = spec["params"]
-    fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
+    run = bind(job["code"], job["spec"])
     max_steps = job.get("max_steps", 600)
     max_bytes = job.get("max_bytes", 1_500_000)
     steps, truncated, size = [], False, [0]
@@ -507,7 +545,14 @@ def job_trace(job, emit):
                 f = f.f_back
             local_vars = {}
             for name, v in frame.f_locals.items():
-                if name == "self" or name.startswith("__"):
+                if name.startswith("__"):
+                    continue
+                if name == "self":
+                    # Design problems keep their state on the object: show its fields.
+                    for attr, av in getattr(v, "__dict__", {}).items():
+                        snap = snapshot(av)
+                        if snap is not None or av is None:
+                            local_vars[f"self.{attr}"] = snap
                     continue
                 snap = snapshot(v)
                 if snap is not None or v is None:
@@ -525,17 +570,17 @@ def job_trace(job, emit):
             steps.append(step)
         return tracer
 
-    real_args = convert_args(copy.deepcopy(job["args"]), params)
+    prepared = run.prepare(job["args"])
     buf, error, result = io.StringIO(), None, None
     sys.settrace(tracer)
     try:
         with redirect_stdout(buf):
-            result = fn(*real_args)
+            result = run.output(prepared, run.invoke(prepared))
     except Exception as exc:
         error = format_error(exc)
     finally:
         sys.settrace(None)
-    return {"steps": steps, "truncated": truncated, "result": to_plain(result),
+    return {"steps": steps, "truncated": truncated, "result": result,
             "error": error, "stdout": buf.getvalue()[:MAX_STDOUT]}
 
 
@@ -545,9 +590,7 @@ def job_line_counts(job, emit):
     Exact, discrete step counts make growth visible to a learner ("this line ran 16, 64, 256
     times") in a way wall-clock timings can't. Sizes stop early once a run gets too big.
     """
-    spec = job["spec"]
-    params = spec["params"]
-    fn = resolve_callable(load_namespace(job["code"]), spec["entry"])
+    run = bind(job["code"], job["spec"])
     gen_ns = load_namespace(job["generator_code"], "<generator>")
     generate = _pick_generator(gen_ns, job)
     cap = job.get("max_events", 200_000)
@@ -560,8 +603,8 @@ def job_line_counts(job, emit):
         trials = max(1, job.get("trials", 1))
         counts, total, capped = {}, 0, False
         for t in range(trials):
-            args = convert_args(generate(random.Random(job.get("seed", 7) + t), n), params)
-            c, tot, cap_hit = _count_lines(fn, args, cap)
+            prepared = run.prepare(generate(random.Random(job.get("seed", 7) + t), n))
+            c, tot, cap_hit = _count_lines(run, prepared, cap)
             for line, v in c.items():
                 counts[line] = counts.get(line, 0) + v
             total, capped = total + tot, capped or cap_hit
@@ -575,7 +618,7 @@ def job_line_counts(job, emit):
     return {"runs": runs, "used_worst_case": generate is gen_ns.get("generate_worst")}
 
 
-def _count_lines(fn, args, cap):
+def _count_lines(run, prepared, cap):
     counts, total = {}, 0
 
     def tracer(frame, event, arg):
@@ -593,7 +636,7 @@ def _count_lines(fn, args, cap):
     sys.settrace(tracer)
     try:
         with redirect_stdout(io.StringIO()):
-            fn(*args)
+            run.invoke(prepared)
     except _StepCap:
         capped = True
     finally:

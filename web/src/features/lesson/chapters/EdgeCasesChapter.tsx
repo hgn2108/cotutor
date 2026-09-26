@@ -8,12 +8,12 @@ import { ArgsInline, ContinueBar, Prose } from '../parts'
 
 interface EdgeItem { def: CaseDef; result: CaseResult }
 
-function pickEdgeCases(defs: CaseDef[], results: CaseResult[]): EdgeItem[] {
+function pickEdgeCases(defs: CaseDef[], results: CaseResult[], design: boolean): EdgeItem[] {
   const byId = new Map(results.map((r) => [r.id, r]))
   const usable = defs
     .map((def) => ({ def, result: byId.get(def.id)! }))
     .filter((x) => x.result && x.result.expected_source !== 'none' && x.def.source !== 'stress' && x.def.category !== 'large'
-      && JSON.stringify(x.def.args).length < 90)
+      && JSON.stringify(x.def.args).length < (design ? 220 : 90))
   const rank = (x: EdgeItem) => (x.def.category === 'tricky' ? 0 : x.def.category === 'edge' ? 1 : 2)
   return usable.sort((a, b) => rank(a) - rank(b)).slice(0, 4)
 }
@@ -62,7 +62,7 @@ function EdgeCase({ item, index, onResult }: { item: EdgeItem; index: number; on
 export function EdgeCasesChapter() {
   const { state, guided, record } = useLesson()
   const last = state.verifications.at(-1)!
-  const items = useMemo(() => pickEdgeCases(last.cases, last.results), [last])
+  const items = useMemo(() => pickEdgeCases(last.cases, last.results, state.spec?.kind === 'design'), [last, state.spec?.kind])
   const [results, setResults] = useState<Record<number, boolean | null>>({})
   const answered = Object.keys(results).length
   const set = (k: number, v: boolean | null) => {

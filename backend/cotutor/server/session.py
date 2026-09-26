@@ -72,11 +72,15 @@ class Session:
         item = library.roadmap_problem(str(ref))
         if item is None:
             return "Unknown roadmap problem."
-        if item["kind"] != "function":
-            return ("Design and special-structure problems aren't supported yet. Paste the "
-                    "statement of a function-style problem instead.")
-        known = None if library.library_match(item["title"]) else KnownProblem(
-            item["entry"], tuple(item["params"]))
+        if item["kind"] == "special":
+            return ("This problem needs node structures that aren't supported yet (cycles, random "
+                    "pointers, graph nodes or round-trip codecs).")
+        if library.library_match(item["title"]):
+            known = None
+        elif item["kind"] == "design":
+            known = KnownProblem(item["class_name"])
+        else:
+            known = KnownProblem(item["entry"], tuple(item["params"]))
         return library.lesson_input(item), known
 
     async def _solve(self, msg: dict[str, Any]) -> None:

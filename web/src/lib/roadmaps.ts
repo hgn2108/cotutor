@@ -37,7 +37,7 @@ export function useRoadmaps() {
   return { data, error }
 }
 
-export const supported = (p: RoadmapProblem) => p.kind === 'function'
+export const supported = (p: RoadmapProblem) => p.kind !== 'special'
 
 /** Problems of one roadmap, in study order (category order, then list order). */
 export function roadmapProblems(data: Roadmaps, id: RoadmapId): RoadmapProblem[] {

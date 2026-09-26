@@ -24,7 +24,7 @@ from cotutor.schemas import (
 )
 
 SPEC = ProblemSpec(
-    is_solvable=True, title="Two Sum",
+    is_solvable=True, title="Two Sum", kind="function",
     summary="Given an integer array nums and an integer target, return the indices of two "
             "different elements that add up to target. Exactly one answer exists.",
     entry="twoSum",

@@ -37,10 +37,12 @@ class KnownProblem:
     confirm the Analyst reconstructed the right problem before anything is taught.
     """
 
-    entry: str
-    params: tuple[str, ...]
+    entry: str                           # function name, or class name for design problems
+    params: tuple[str, ...] | None = None  # None for design problems
 
     def matches(self, spec: ProblemSpec) -> bool:
+        if self.params is None:
+            return spec.kind == "design" and spec.entry == self.entry
         return spec.entry == self.entry and tuple(p.name for p in spec.params) == self.params
 
 

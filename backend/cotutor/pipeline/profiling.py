@@ -128,7 +128,7 @@ class Profiler:
             slope = res.get("slope")
             if res.get("stopped") and len(res.get("points", [])) < 4:
                 slope = None  # too few trustworthy points to judge growth
-            chk = check_complexity(solution.time_complexity, slope)
+            chk = check_complexity(solution.time_complexity, slope, per_operation=spec.kind == "design")
             if res.get("stopped"):
                 chk.note += f" (Sweep {res['stopped']}.)"
             st.note(chk.note, "done" if chk.verdict in ("consistent", "inconclusive") else "warning")
