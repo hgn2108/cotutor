@@ -11,6 +11,8 @@ export interface ExecLogEntry { id: string; kind: string; ms: number; outcome: '
 export interface RunState {
   status: 'idle' | 'running' | 'done' | 'error'
   problem: string
+  /** The lesson was generated from the problem's name (no original statement to show). */
+  byName: boolean
   stages: StageEvent[]
   spec?: ProblemSpec
   testPlan?: TestPlan
@@ -30,7 +32,7 @@ export interface RunState {
 }
 
 const initial: RunState = {
-  status: 'idle', problem: '', stages: [], solutions: [], verifications: [], debugAttempts: [], execLog: [],
+  status: 'idle', problem: '', byName: false, stages: [], solutions: [], verifications: [], debugAttempts: [], execLog: [],
 }
 
 type Action =
@@ -60,6 +62,8 @@ function reducer(state: RunState, action: Action): RunState {
 
 function applyMessage(state: RunState, msg: ServerMessage): RunState {
   switch (msg.type) {
+    case 'problem':
+      return { ...state, problem: msg.text, byName: msg.by_name }
     case 'stage': {
       const i = state.stages.findIndex((s) => s.id === msg.id)
       const stages = i < 0 ? [...state.stages, msg] : state.stages.map((s, j) => (j === i ? msg : s))
@@ -104,7 +108,7 @@ async function connectPatiently(connect: () => Promise<WebSocket>, attempts = 25
   }
 }
 
-export interface SolveOptions { apiKey?: string; fresh?: boolean }
+export interface SolveOptions { apiKey?: string; fresh?: boolean; ref?: string }
 
 export function useRun() {
   const [state, dispatch] = useReducer(reducer, initial)
@@ -175,7 +179,7 @@ export function useRun() {
     dispatch({ type: 'start', problem })
     try {
       const ws = await connectPatiently(connect)
-      ws.send(JSON.stringify({ type: 'solve', problem, api_key: opts.apiKey, fresh: opts.fresh }))
+      ws.send(JSON.stringify({ type: 'solve', problem, ref: opts.ref, api_key: opts.apiKey, fresh: opts.fresh }))
     } catch (err) {
       dispatch({ type: 'fail', message: String((err as Error).message ?? err) })
     }

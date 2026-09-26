@@ -27,7 +27,9 @@ class Example(BaseModel):
 class ProblemSpec(BaseModel):
     is_solvable: bool = Field(description="False if the input is not a well-defined coding problem.")
     title: str
-    summary: str = Field(description="Precise 2-4 sentence restatement of the task.")
+    summary: str = Field(description=(
+        "Restatement in exactly this shape, each on its own line: 'Input: ...', 'Output: ...', "
+        "then 'Rules: ...' for any constraint that matters. Plain words, no story."))
     entry: str = Field(description="Function/method name, LeetCode style (e.g. 'twoSum').")
     params: list[Param]
     return_type: str

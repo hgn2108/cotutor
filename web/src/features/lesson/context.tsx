@@ -5,6 +5,14 @@ export type ChapterId = 'problem' | 'pattern' | 'brute' | 'bottleneck' | 'insigh
 
 export interface Score { correct: number; total: number }
 
+/** Set when the lesson was opened from a roadmap. */
+export interface RoadmapLink {
+  title: string
+  url: string
+  next?: { title: string; start: () => void }
+  back: () => void
+}
+
 export interface LessonCtx {
   state: RunState
   guided: boolean
@@ -14,6 +22,10 @@ export interface LessonCtx {
   scores: Partial<Record<ChapterId, Score>>
   onSolve: (problem: string) => void
   dark: boolean
+  roadmap?: RoadmapLink
+  /** Mark the lesson finished: guided mode reports a score, walkthrough reports null. */
+  finish: (score: number | null) => void
+  finished: boolean
 }
 
 export const LessonContext = createContext<LessonCtx | null>(null)

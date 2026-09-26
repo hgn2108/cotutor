@@ -6,6 +6,7 @@ import { Badge, Button, Card, difficultyTone } from '../../components/ui'
 import type { RunState } from '../../lib/useRun'
 import { SummaryBar } from '../hood/SummaryBar'
 import { UnderTheHood } from '../hood/UnderTheHood'
+import type { RoadmapLink } from '../lesson/context'
 import { Lesson } from '../lesson/Lesson'
 
 interface Props {
@@ -14,13 +15,16 @@ interface Props {
   mode: LearnMode
   setMode: (m: LearnMode) => void
   dark: boolean
-  onSolve: (problem: string, fresh?: boolean) => void
+  onSolve: (problem: string) => void
+  onRerun: () => void
   onCancel: () => void
   onBack: () => void
+  roadmap?: RoadmapLink
+  onComplete?: (score: number | null, mode: 'guided' | 'walkthrough') => void
 }
 
 /** A single problem: the lesson, with the engineering view one click away. */
-export function RunPage({ state, runId, mode, setMode, dark, onSolve, onCancel, onBack }: Props) {
+export function RunPage({ state, runId, mode, setMode, dark, onSolve, onRerun, onCancel, onBack, roadmap, onComplete }: Props) {
   const [view, setView] = useState<'lesson' | 'hood'>('lesson')
   const guided = mode === 'guided'
   // In guided mode the pattern tags would give the answer away before the learner guesses.
@@ -36,7 +40,7 @@ export function RunPage({ state, runId, mode, setMode, dark, onSolve, onCancel, 
   return (
     <main className="mx-auto max-w-[1320px] px-4 pb-20 pt-5 sm:px-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Button variant="ghost" onClick={onBack} className="-ml-2"><ArrowLeft className="size-4" />New problem</Button>
+        <Button variant="ghost" onClick={onBack} className="-ml-2"><ArrowLeft className="size-4" />{roadmap ? 'Roadmap' : 'New problem'}</Button>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {view === 'lesson' && <ModeToggle mode={mode} setMode={setMode} size="sm" />}
           <div className="flex rounded-lg border border-line p-0.5">
@@ -45,7 +49,7 @@ export function RunPage({ state, runId, mode, setMode, dark, onSolve, onCancel, 
           </div>
           {state.status === 'running' && <Button variant="outline" className="text-xs" onClick={onCancel}><Square className="size-3" />Stop</Button>}
           {state.status !== 'running' && state.problem && (
-            <Button variant="outline" className="text-xs" onClick={() => onSolve(state.problem, true)} title="Run all agents again instead of replaying a saved run">
+            <Button variant="outline" className="text-xs" onClick={onRerun} title="Run all agents again instead of replaying a saved run">
               <RotateCw className="size-3" />Re-run live
             </Button>
           )}
@@ -72,7 +76,7 @@ export function RunPage({ state, runId, mode, setMode, dark, onSolve, onCancel, 
       {/* The lesson stays mounted while peeking under the hood so progress isn't lost. */}
       <div className={view === 'lesson' ? '' : 'hidden'}>
         <Lesson key={runId} state={state} guided={guided} dark={dark} onSolve={(p) => { setView('lesson'); onSolve(p) }}
-          onUnderTheHood={() => { setView('hood'); window.scrollTo({ top: 0 }) }} />
+          onUnderTheHood={() => { setView('hood'); window.scrollTo({ top: 0 }) }} roadmap={roadmap} onComplete={onComplete} />
       </div>
       {view === 'hood' && <UnderTheHood state={state} dark={dark} />}
     </main>

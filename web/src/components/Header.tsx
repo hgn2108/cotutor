@@ -14,6 +14,8 @@ interface Props {
   apiKey: string
   setApiKey: (k: string) => void
   onHome: () => void
+  onRoadmaps: () => void
+  onRoadmapsPage: boolean
 }
 
 const sandboxLabel: Record<SandboxStatus, [string, 'ok' | 'warn' | 'bad' | 'neutral']> = {
@@ -44,7 +46,9 @@ export function Header(p: Props) {
           <img src="/favicon.svg" alt="" className="size-7" />
           <span className="text-[15px] font-semibold tracking-tight">Cotutor</span>
         </button>
-        <span className="hidden text-sm text-faint md:inline">Solve · verify · visualize</span>
+        <nav className="ml-2 flex items-center gap-1 text-[13px]">
+          <button onClick={p.onRoadmaps} className={`rounded-md px-2.5 py-1 font-medium transition ${p.onRoadmapsPage ? 'bg-sunken text-ink' : 'text-muted hover:text-ink'}`}>Roadmaps</button>
+        </nav>
         <div className="ml-auto flex items-center gap-2">
           <Badge tone={tone} className="hidden sm:inline-flex" title="Code runs locally in your browser via Pyodide (WebAssembly)">
             <span className="size-1.5 rounded-full bg-current" />{label}

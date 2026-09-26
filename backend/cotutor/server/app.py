@@ -30,6 +30,14 @@ def problems() -> list[dict[str, Any]]:
     return library.problems()
 
 
+@app.get("/api/roadmaps")
+def roadmaps() -> dict[str, Any]:
+    """Roadmaps, marking which lessons are already recorded (instant and free to open)."""
+    data = library.roadmaps()
+    problems = [p | {"recorded": deps.cache.has(library.lesson_input(p))} for p in data["problems"]]
+    return data | {"problems": problems}
+
+
 @app.get("/api/harness.py", response_class=PlainTextResponse)
 def harness() -> str:
     """The execution harness, loaded into the browser's Pyodide sandbox."""

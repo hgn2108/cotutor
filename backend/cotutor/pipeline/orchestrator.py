@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from .. import agents
@@ -28,6 +29,21 @@ from .verification import Verifier
 log = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class KnownProblem:
+    """A problem identified by name (e.g. from a roadmap) with its real signature.
+
+    The lesson is reconstructed from the name, so the signature is the ground truth used to
+    confirm the Analyst reconstructed the right problem before anything is taught.
+    """
+
+    entry: str
+    params: tuple[str, ...]
+
+    def matches(self, spec: ProblemSpec) -> bool:
+        return spec.entry == self.entry and tuple(p.name for p in spec.params) == self.params
+
+
 class Pipeline:
     def __init__(self, llm: LLMClient, executor: Executor, emit: Emit,
                  config: PipelineConfig | None = None):
@@ -36,10 +52,10 @@ class Pipeline:
         self.profiler = Profiler(self.ctx)
         self.teacher = Teacher(self.ctx)
 
-    async def run(self, problem: str) -> dict[str, Any]:
+    async def run(self, problem: str, known: KnownProblem | None = None) -> dict[str, Any]:
         """Run end to end. Always finishes with a ``done`` event, even on failure."""
         try:
-            summary = await self._run(problem)
+            summary = await self._run(problem, known)
         except LLMError as exc:
             summary = {"verified": False, "error": str(exc)}
             await self.ctx.emit({"type": "error", "message": str(exc)})
@@ -54,12 +70,20 @@ class Pipeline:
         await self.ctx.emit({"type": "done", "summary": summary})
         return summary
 
-    async def _run(self, problem: str) -> dict[str, Any]:
+    async def _run(self, problem: str, known: KnownProblem | None) -> dict[str, Any]:
         spec = await self._analyze(problem)
         if not spec.is_solvable:
             await self.ctx.emit({"type": "error", "message": "Please describe a coding problem "
                                  "with clear inputs and outputs."})
             return {"verified": False, "error": "not_a_problem"}
+        if known and not known.matches(spec):
+            await self.ctx.emit({"type": "error", "code": "unrecognized", "message":
+                                 "Couldn't reconstruct this problem reliably from its name. Paste "
+                                 "the problem statement to get a lesson for it."})
+            return {"verified": False, "error": "signature_mismatch"}
+        # Signal phrases must quote text the learner sees: the original statement, or for a
+        # problem given by name, the Analyst's own restatement.
+        statement = spec.summary if known else problem
 
         # Test design and solving are independent, so the two agents work in parallel.
         plan, solution = await asyncio.gather(self._design_tests(spec), self._solve(spec))
@@ -70,7 +94,7 @@ class Pipeline:
         # The first half of the lesson only needs the spec, the brute force and the approach,
         # so the Coach teaches while verification is still running.
         intro_task = asyncio.create_task(
-            self.teacher.lesson_intro(problem, spec, solution, plan, reference.brute_is_optimal))
+            self.teacher.lesson_intro(statement, spec, solution, plan, reference.brute_is_optimal))
         explain_task: asyncio.Task | None = None
         try:
             cases = self.verifier.build_cases(spec, plan)

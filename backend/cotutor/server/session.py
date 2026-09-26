@@ -12,10 +12,11 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from .. import library
 from ..cache import replay
 from ..config import settings
 from ..executor import ClientExecutor
-from ..pipeline import Pipeline, PipelineConfig
+from ..pipeline import KnownProblem, Pipeline, PipelineConfig
 from . import deps
 
 MAX_PROBLEM_CHARS = 6000
@@ -63,12 +64,34 @@ class Session:
         elif kind == "cancel" and self.task:
             self.task.cancel()
 
+    def _resolve(self, msg: dict[str, Any]) -> tuple[str, KnownProblem | None] | str:
+        """The text to run, plus the known signature for roadmap problems (or an error)."""
+        ref = msg.get("ref")
+        if not ref:
+            return str(msg.get("problem", "")).strip()[:MAX_PROBLEM_CHARS], None
+        item = library.roadmap_problem(str(ref))
+        if item is None:
+            return "Unknown roadmap problem."
+        if item["kind"] != "function":
+            return ("Design and special-structure problems aren't supported yet. Paste the "
+                    "statement of a function-style problem instead.")
+        known = None if library.library_match(item["title"]) else KnownProblem(
+            item["entry"], tuple(item["params"]))
+        return library.lesson_input(item), known
+
     async def _solve(self, msg: dict[str, Any]) -> None:
-        problem = str(msg.get("problem", "")).strip()[:MAX_PROBLEM_CHARS]
+        resolved = self._resolve(msg)
+        if isinstance(resolved, str):
+            await self.send({"type": "error", "message": resolved})
+            return
+        problem, known = resolved
         user_key = (msg.get("api_key") or "").strip() or None
         if len(problem) < MIN_PROBLEM_CHARS:
             await self.send({"type": "error", "message": "Please paste a full problem statement."})
             return
+        # Tell the UI what is actually being taught; by_name means there is no original text to
+        # show (the lesson restates the problem in its own words).
+        await self.send({"type": "problem", "text": problem, "by_name": known is not None})
 
         if not msg.get("fresh") and (record := deps.cache.get(problem)):
             await replay(record, self.send)
@@ -94,5 +117,5 @@ class Session:
 
         config = PipelineConfig(max_debug_attempts=settings.max_debug_attempts,
                                 exec_timeout_s=settings.exec_timeout_s)
-        await Pipeline(llm, self.executor, emit, config).run(problem)
+        await Pipeline(llm, self.executor, emit, config).run(problem, known)
         deps.cache.put(problem, events, {"recording": "live"})

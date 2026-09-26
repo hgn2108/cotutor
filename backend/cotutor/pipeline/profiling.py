@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import agents
-from ..complexity import EXPONENTIAL, expected_slope
 from ..complexity import check as check_complexity
+from ..complexity import expected_slope, normalize_claim
 from ..llm import LLMError
 from ..runtime.harness import fit_slope
 from ..schemas import ProblemSpec, Solution, TestPlan
@@ -88,10 +88,11 @@ class Profiler:
                 st.note(f"Rewrote the brute force: it now grows like n^{ref2:.1f} vs n^{sol:.1f}.")
                 await self.ctx.artifact("test_plan", retry.model_dump())
                 return ReferenceCheck(retry, False)
-            if self._claims_disagree(plan, solution):
-                # The claims say the brute force is much slower but the counts don't show it: the
-                # generator's n likely doesn't grow the dimension that matters. Never tell learners
-                # "the direct approach is optimal" based on a measurement on the wrong axis.
+            if not self._claims_equivalent(plan, solution):
+                # The counts can't tell them apart, but the claimed complexities differ: the
+                # generator's n likely doesn't grow the dimension that matters (e.g. the largest
+                # pile in Koko Eating Bananas). Telling learners "the direct approach is optimal"
+                # needs both the measurement and the claims to agree.
                 st.note(f"Inconclusive: the brute force claims {plan.reference_time_complexity} vs "
                         f"{solution.time_complexity}, but measured growth matches; the input "
                         "generator likely doesn't scale the dominant dimension.", "warning")
@@ -100,12 +101,13 @@ class Profiler:
             return ReferenceCheck(plan, True)
 
     @staticmethod
-    def _claims_disagree(plan: TestPlan, solution: Solution) -> bool:
-        ref_claim = expected_slope(plan.reference_time_complexity)
-        sol_claim = expected_slope(solution.time_complexity)
-        if ref_claim == EXPONENTIAL:
-            return sol_claim != EXPONENTIAL
-        return ref_claim is not None and sol_claim is not None and ref_claim >= sol_claim + 0.9
+    def _claims_equivalent(plan: TestPlan, solution: Solution) -> bool:
+        """Do the brute force and the solution claim the same complexity?"""
+        ref, sol = plan.reference_time_complexity, solution.time_complexity
+        ref_slope, sol_slope = expected_slope(ref), expected_slope(sol)
+        if ref_slope is not None and sol_slope is not None:
+            return abs(ref_slope - sol_slope) <= 0.4
+        return normalize_claim(ref) == normalize_claim(sol)  # e.g. both "O(m * n)"
 
     async def growth_at_scale(self, spec: ProblemSpec, plan: TestPlan,
                               solution: Solution) -> dict[str, Any] | None:

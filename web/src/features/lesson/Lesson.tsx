@@ -12,7 +12,7 @@ import { PatternChapter } from './chapters/PatternChapter'
 import { ProblemChapter } from './chapters/ProblemChapter'
 import { RecapChapter } from './chapters/RecapChapter'
 import { WatchChapter } from './chapters/WatchChapter'
-import { type ChapterId, LessonContext, type LessonCtx, type Score } from './context'
+import { type ChapterId, LessonContext, type LessonCtx, type RoadmapLink, type Score } from './context'
 
 interface ChapterDef {
   id: ChapterId
@@ -41,24 +41,38 @@ interface Props {
   dark: boolean
   onSolve: (problem: string) => void
   onUnderTheHood: () => void
+  roadmap?: RoadmapLink
+  onComplete?: (score: number | null, mode: 'guided' | 'walkthrough') => void
 }
 
-export function Lesson({ state, guided, dark, onSolve, onUnderTheHood }: Props) {
+export function Lesson({ state, guided, dark, onSolve, onUnderTheHood, roadmap, onComplete }: Props) {
   const [done, setDone] = useState<Set<ChapterId>>(new Set())
   const [scores, setScores] = useState<Partial<Record<ChapterId, Score>>>({})
   const refs = useRef<Partial<Record<ChapterId, HTMLElement | null>>>({})
   const lastCompleted = useRef<ChapterId | null>(null)
 
+  const record = useCallback((id: ChapterId, score: Score) => setScores((s) => ({ ...s, [id]: score })), [])
+  const [finished, setFinished] = useState(false)
+  const finish = useCallback((score: number | null) => {
+    if (finished) return
+    setFinished(true)
+    onComplete?.(score, guided ? 'guided' : 'walkthrough')
+  }, [finished, onComplete, guided])
   const complete = useCallback((id: ChapterId) => {
     lastCompleted.current = id
-    setDone((d) => new Set(d).add(id))
-  }, [])
-  const record = useCallback((id: ChapterId, score: Score) => setScores((s) => ({ ...s, [id]: score })), [])
+    const next = new Set(done).add(id)
+    setDone(next)
+    // A guided lesson is finished once every step is done; its score feeds spaced repetition.
+    if (guided && CHAPTERS.every((c) => next.has(c.id))) {
+      const t = Object.values(scores).reduce((a, x) => ({ c: a.c + x.correct, n: a.n + x.total }), { c: 0, n: 0 })
+      finish(t.n ? t.c / t.n : null)
+    }
+  }, [done, guided, scores, finish])
   const ctx: LessonCtx = useMemo(() => ({
-    state, guided, dark, onSolve, scores, record, complete, isDone: (id) => done.has(id),
-  }), [state, guided, dark, onSolve, scores, record, complete, done])
+    state, guided, dark, onSolve, scores, record, complete, isDone: (id) => done.has(id), roadmap, finish, finished,
+  }), [state, guided, dark, onSolve, scores, record, complete, done, roadmap, finish, finished])
 
-  const finished = state.status !== 'running'
+  const runFinished = state.status !== 'running'
   const firstOpen = CHAPTERS.findIndex((c) => !done.has(c.id))
   const unlockedUpTo = guided ? (firstOpen === -1 ? CHAPTERS.length - 1 : firstOpen) : CHAPTERS.length - 1
   const visible = CHAPTERS.slice(0, unlockedUpTo + 1)
@@ -94,7 +108,7 @@ export function Lesson({ state, guided, dark, onSolve, onUnderTheHood }: Props) 
                     {isDone ? <Check className="size-3" strokeWidth={3} /> : locked ? <Lock className="size-2.5" /> : k + 1}
                   </span>
                   <span className="flex-1 truncate">{c.title}</span>
-                  {!ready && !finished && !locked && <Spinner className="size-3 text-faint" />}
+                  {!ready && !runFinished && !locked && <Spinner className="size-3 text-faint" />}
                 </button>
               )
             })}
@@ -126,7 +140,7 @@ export function Lesson({ state, guided, dark, onSolve, onUnderTheHood }: Props) 
                   <h2 className="mt-0.5 text-[19px] font-semibold tracking-tight">{c.title}</h2>
                   <p className="mt-0.5 text-[13.5px] text-muted">{c.blurb}</p>
                 </header>
-                {ready ? c.render() : finished ? (
+                {ready ? c.render() : runFinished ? (
                   <Unavailable id={c.id} />
                 ) : (
                   <div className="flex h-24 items-center justify-center gap-2 rounded-xl bg-sunken/60 text-sm text-faint"><Spinner />{c.waiting}</div>

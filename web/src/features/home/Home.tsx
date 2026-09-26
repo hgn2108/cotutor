@@ -1,4 +1,4 @@
-import { ArrowRight, FlaskConical, Gauge, Play, Search, ShieldCheck } from 'lucide-react'
+import { ArrowRight, FlaskConical, Gauge, MapIcon, Play, Search, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getJson } from '../../lib/api'
 import type { LibraryProblem } from '../../lib/types'
@@ -9,6 +9,7 @@ interface Props {
   mode: LearnMode
   setMode: (m: LearnMode) => void
   onSolve: (problem: string) => void
+  onRoadmap: (id: 'blind75' | 'neetcode150') => void
 }
 
 const pillars = [
@@ -18,7 +19,7 @@ const pillars = [
   { icon: ShieldCheck, title: 'Verified before taught', body: 'Every solution passes tests and hundreds of random inputs in a sandbox before you see it.' },
 ]
 
-export function Home({ mode, setMode, onSolve }: Props) {
+export function Home({ mode, setMode, onSolve, onRoadmap }: Props) {
   const [text, setText] = useState('')
   const [library, setLibrary] = useState<LibraryProblem[]>([])
   useEffect(() => { getJson<LibraryProblem[]>('/api/problems').then(setLibrary).catch(() => {}) }, [])
@@ -50,6 +51,25 @@ export function Home({ mode, setMode, onSolve }: Props) {
           <ModeToggle mode={mode} setMode={setMode} size="sm" />
           <span className="ml-auto hidden text-xs text-faint sm:inline">⌘ + Enter</span>
           <Button onClick={submit} disabled={text.trim().length < 15}><Play className="size-3.5" />{mode === 'guided' ? 'Start lesson' : 'Explain it'}</Button>
+        </div>
+      </div>
+
+      <div className="mt-12">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold">Follow a roadmap</h2>
+          <span className="text-xs text-faint">Progress and review reminders are saved in your browser</span>
+        </div>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {([['blind75', 'Blind 75', 'The classic interview shortlist, one problem per core pattern.'],
+             ['neetcode150', 'NeetCode 150', 'Blind 75 plus 75 more, grouped into 18 patterns.']] as const).map(([id, title, body]) => (
+            <button key={id} onClick={() => onRoadmap(id)} className="group rounded-xl border border-line bg-panel p-4 text-left transition hover:border-accent/50 hover:shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-[15px] font-semibold"><MapIcon className="size-4 text-accent" />{title}</span>
+                <ArrowRight className="size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-accent" />
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{body}</p>
+            </button>
+          ))}
         </div>
       </div>
 

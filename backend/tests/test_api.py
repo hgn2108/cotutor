@@ -34,6 +34,8 @@ def drive_session(ws, message):
             result = asyncio.run(local.run(msg["job"], msg["timeout_s"]))
             ws.send_json({"type": "exec_result", "id": msg["id"], "result": result})
             continue
+        if msg["type"] == "problem":
+            continue
         events.append(msg)
         if msg["type"] in ("done", "error"):
             return events

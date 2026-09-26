@@ -1,9 +1,9 @@
-import { BookOpen, Check, ChevronRight, Repeat, TriangleAlert, X } from 'lucide-react'
-import { Badge, Card } from '../../../components/ui'
+import { ArrowLeft, BookOpen, Check, ChevronRight, ExternalLink, Repeat, TriangleAlert, X } from 'lucide-react'
+import { Badge, Button, Card } from '../../../components/ui'
 import { useLesson } from '../context'
 
 export function RecapChapter() {
-  const { state, guided, scores, onSolve } = useLesson()
+  const { state, guided, scores, onSolve, roadmap, finish, finished } = useLesson()
   const deep = state.lessonDeep
   const intro = state.lessonIntro
   const ex = state.explanation
@@ -54,6 +54,21 @@ export function RecapChapter() {
           </Card>
         )}
       </div>
+      {roadmap && (
+        <Card className="flex flex-wrap items-center gap-3 p-4">
+          <div className="min-w-0 flex-1 text-[13px]">
+            {finished
+              ? <span className="flex items-center gap-1.5 font-medium text-ok"><Check className="size-4" />Saved to your roadmap progress</span>
+              : <span className="text-muted">{guided ? 'Finish every step to save this to your roadmap progress.' : 'Read through? Mark it so it shows up for review later.'}</span>}
+            <a href={roadmap.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-xs text-accent hover:underline">
+              Now solve it yourself on LeetCode<ExternalLink className="size-3" />
+            </a>
+          </div>
+          {!guided && !finished && <Button variant="outline" onClick={() => finish(null)}><Check className="size-3.5" />Mark as reviewed</Button>}
+          <Button variant="ghost" onClick={roadmap.back}><ArrowLeft className="size-3.5" />Roadmap</Button>
+          {roadmap.next && <Button onClick={roadmap.next.start}>Next: {roadmap.next.title}<ChevronRight className="size-3.5" /></Button>}
+        </Card>
+      )}
     </div>
   )
 }

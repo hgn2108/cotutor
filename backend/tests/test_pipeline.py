@@ -151,3 +151,17 @@ async def test_claimed_exponential_brute_force_is_not_called_optimal():
     note = next(e for e in events if e["type"] == "stage" and e["id"] == "naive_check"
                 and e["status"] != "running")["detail"]
     assert note.startswith("Inconclusive")
+
+
+async def test_multi_variable_claims_never_yield_already_optimal():
+    """Koko Eating Bananas: counts match on n, but O(n*max) vs O(n log max) differ."""
+    script = two_sum_script()
+    ref = script["test_designer"][0].model_copy(update={
+        "reference_time_complexity": "O(n * max(piles))",
+        "reference_solution": script["solver"][0].code.replace("class Solution:\n", "").replace(
+            "    def twoSum(self, nums, target):", "def twoSum(nums, target):").replace("\n    ", "\n"),
+    })
+    script["test_designer"] = [ref, ref]
+    script["solver"][0] = script["solver"][0].model_copy(update={"time_complexity": "O(n log max(piles))"})
+    _, events, _ = await run_pipeline(script)
+    assert artifacts(events, "lesson_intro")[0]["brute_is_optimal"] is False

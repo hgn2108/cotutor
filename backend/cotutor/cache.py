@@ -28,7 +28,7 @@ class RunCache:
         self.dir = directory
         self.dir.mkdir(parents=True, exist_ok=True)
         self._demos: dict[str, Path] = {}
-        for path in sorted(DEMO_DIR.glob("*.json")):
+        for path in sorted(DEMO_DIR.rglob("*.json")):
             rec = json.loads(path.read_text())
             self._demos[cache_key(rec["problem"])] = path
 
@@ -38,6 +38,10 @@ class RunCache:
             if path and path.exists():
                 return json.loads(path.read_text())
         return None
+
+    def has(self, problem: str) -> bool:
+        key = cache_key(problem)
+        return key in self._demos or (self.dir / f"{key}.json").exists()
 
     def put(self, problem: str, events: list[dict[str, Any]], meta: dict | None = None) -> None:
         if not events or events[-1].get("type") != "done":

@@ -21,7 +21,7 @@ export function SummaryBar({ state }: { state: RunState }) {
         {spec && <Badge tone={difficultyTone[spec.difficulty]}>{spec.difficulty}</Badge>}
         {spec?.pattern_tags.map((t) => <Badge key={t}>{t}</Badge>)}
       </div>
-      {spec && <p className="max-w-3xl text-[13.5px] leading-relaxed text-muted">{spec.summary}</p>}
+      {spec && <p className="max-w-3xl whitespace-pre-line text-[13.5px] leading-relaxed text-muted">{spec.summary}</p>}
       <div className="flex flex-wrap gap-1.5">
         {summary && (summary.verified
           ? <Badge tone="ok"><BadgeCheck className="size-3.5" />Verified</Badge>

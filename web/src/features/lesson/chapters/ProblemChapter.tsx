@@ -1,22 +1,40 @@
-import { Search } from 'lucide-react'
+import { ExternalLink, Search } from 'lucide-react'
 import { Badge } from '../../../components/ui'
 import { useLesson } from '../context'
 import { ArgsInline, Callout, ContinueBar, HighlightedText, Prose } from '../parts'
 
 export function ProblemChapter() {
-  const { state, guided, isDone } = useLesson()
+  const { state, guided, isDone, roadmap } = useLesson()
   const { spec, lessonIntro } = state
   const showSignals = !!lessonIntro && (!guided || isDone('pattern'))
   return (
     <div>
-      <div className="whitespace-pre-wrap rounded-xl border border-line bg-sunken/60 px-4 py-3.5 text-[14px] leading-relaxed">
-        <HighlightedText text={state.problem} phrases={showSignals ? lessonIntro.signals.map((s) => s.phrase) : []} />
-      </div>
+      {state.byName ? (
+        <div className="rounded-xl border border-line bg-sunken/60 px-4 py-3.5">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">The problem, in our own words</span>
+            {roadmap && (
+              <a href={roadmap.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                Read the original on LeetCode<ExternalLink className="size-3" />
+              </a>
+            )}
+          </div>
+          {spec ? (
+            <p className="whitespace-pre-line text-[14px] leading-relaxed">
+              <HighlightedText text={spec.summary} phrases={showSignals ? lessonIntro.signals.map((s) => s.phrase) : []} />
+            </p>
+          ) : <p className="text-sm text-faint">Reconstructing the problem from its name…</p>}
+        </div>
+      ) : (
+        <div className="whitespace-pre-wrap rounded-xl border border-line bg-sunken/60 px-4 py-3.5 text-[14px] leading-relaxed">
+          <HighlightedText text={state.problem} phrases={showSignals ? lessonIntro.signals.map((s) => s.phrase) : []} />
+        </div>
+      )}
       {spec && (
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">In other words</div>
-            <Prose>{spec.summary}</Prose>
+            {!state.byName && <><div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">In other words</div>
+            <Prose className="whitespace-pre-line">{spec.summary}</Prose></>}
             {spec.constraints.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">{spec.constraints.map((c) => <Badge key={c} className="font-mono">{c}</Badge>)}</div>
             )}

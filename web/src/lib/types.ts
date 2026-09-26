@@ -167,6 +167,7 @@ export interface LibraryProblem {
 
 export type ServerMessage =
   | { type: 'hello'; features: Features }
+  | { type: 'problem'; text: string; by_name: boolean }
   | StageEvent
   | { type: 'artifact'; name: string; data: unknown }
   | { type: 'exec_request'; id: string; job: Record<string, unknown>; timeout_s: number }

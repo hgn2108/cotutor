@@ -24,6 +24,10 @@ EXPONENTIAL = 99.0  # stands in for "grows faster than any polynomial"
 _EXPONENTIAL = re.compile(r"(\d|[a-z)])\^\(?[a-z]|[a-z]!|\bfactorial|exponential|[²³]?ⁿ")
 
 
+def normalize_claim(claim: str) -> str:
+    return re.sub(r"[\s*·×]", "", claim.lower())
+
+
 def expected_slope(claim: str) -> float | None:
     """Log-log slope a claimed Big-O implies on doubling n; EXPONENTIAL for 2^n, k^n, n!."""
     norm = re.sub(r"\s+", "", claim.lower()).replace("·", "*")
