@@ -1,0 +1,21 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# One free web service for the backend, built from backend/Dockerfile and redeployed on every
+# push to main that touches backend/. Secrets marked sync: false are entered in the dashboard.
+services:
+  - type: web
+    name: cotutor-api
+    runtime: docker
+    plan: free
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    buildFilter:
+      paths: ["backend/**"]
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: COTUTOR_ALLOWED_ORIGINS
+        sync: false
+      - key: COTUTOR_ALLOWED_ORIGIN_REGEX
+        value: ^https://cotutor(-[a-z0-9-]+)?\.vercel\.app$

@@ -1,4 +1,4 @@
-# Backend image for Hugging Face Spaces (Docker SDK, free CPU tier) or any container host.
+# Backend image for Render (free web service) or any container host.
 # The server never executes user or model code (that happens in the browser), so it needs
 # no sandboxing and runs fine on the smallest instance.
 FROM python:3.12-slim
@@ -17,4 +17,5 @@ ENV PATH="/app/.venv/bin:$PATH" \
     COTUTOR_CACHE_DIR=/tmp/cotutor-cache \
     PYTHONUNBUFFERED=1
 EXPOSE 7860
-CMD ["uvicorn", "cotutor.server.app:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# Hosts like Render pass the port in $PORT; default to 7860 elsewhere.
+CMD ["sh", "-c", "exec uvicorn cotutor.server.app:app --host 0.0.0.0 --port ${PORT:-7860} --proxy-headers --forwarded-allow-ips '*'"]

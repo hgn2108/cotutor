@@ -144,7 +144,7 @@ Cotutor supports both ways people use LLM apps:
 |---|---|---|
 | For | Trying it instantly | Regular use; your own quota and privacy |
 | Frontend | Vercel or Cloudflare Pages (static) | `npm run dev` or any static host |
-| Backend | Hugging Face Spaces (Docker, free CPU) via [`backend/Dockerfile`](backend/Dockerfile) | `uvicorn` locally, or the same container |
+| Backend | Render free web service from [`render.yaml`](render.yaml) and [`backend/Dockerfile`](backend/Dockerfile) | `uvicorn` locally, or the same container |
 | API key | Shared server key with a per-IP hourly limit; users can paste their own key in Settings | Your key in `.env` |
 
 The server only orchestrates. Code execution happens in each visitor's browser, so the backend fits on the smallest free instance and hosting untrusted code is not a concern. Step-by-step instructions: [docs/DEPLOY.md](docs/DEPLOY.md). Pushes to `main` redeploy both automatically.
