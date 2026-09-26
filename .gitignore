@@ -9,3 +9,4 @@ dist/
 backend/cotutor/data/cache/
 web/*.tsbuildinfo
 .claude/
+backend/evals/runs/
