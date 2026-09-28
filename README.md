@@ -91,6 +91,7 @@ flowchart LR
 - **Survive free-tier limits.** A health-aware model router tries a fallback chain of models, puts overloaded models on a shared cooldown, and retries in rounds. Falling back to a lighter model is safe because every output is verified.
 - **Know what it can't verify.** Problems that can't be checked by running a Python function or class (interactive judge APIs, randomized output, SQL/shell/concurrency, third-party libraries) are declined with the reason instead of producing an unverifiable lesson.
 - **Made-up examples aren't ground truth.** For statements without examples the Analyst invents some. If the brute force and the solution, written independently, agree with each other against an invented example, the example is corrected rather than the correct code being "fixed". Examples from the user's statement stay authoritative.
+- **Referee disagreements instead of trusting the oracle.** The brute force is agent-written too. When the solution fails only on reference-graded inputs, an independent Referee works out the answer from the statement. It sees the input and the two outputs in random order, but not either program. If it sides with the solution, the reference stops grading, and correct code isn't rewritten to match a wrong reference.
 - **Teach while verifying.** The first half of the lesson only needs the spec and the oracle, so it is written in parallel with verification. Test design also runs in parallel with solving.
 
 ## Code layout
@@ -157,24 +158,21 @@ The server only orchestrates. Code execution happens in each visitor's browser, 
 
 The [evaluation suite](backend/evals/README.md) scores runs against independent ground truth: hand-written golden solutions with hidden tests for 55 famous problems and **16 original problems** (novel wording and twists, two with no examples), so the models can't just recall an answer.
 
-**Early results** (September 2026, free-tier Gemini):
+**Live results** (September 2026, free-tier Gemini 3.x with fallbacks; full reports in [`evals/results/`](backend/evals/results/)):
 
-| Check | Result |
-|---|---|
-| Recorded lessons correct on hidden golden tests (49 problems) | 49 / 49; no false verifications |
-| Problem reconstructed from its name alone, with the exact LeetCode signature ([`evals/name_recognition.py`](backend/evals/name_recognition.py), 20 Blind 75 / NeetCode 150 problems) | 20 / 20 |
-| Cost of a new lesson (median) | 6.5 LLM calls · ~7.7k tokens · ~25 s |
+| | Famous (55, from names) | Novel (16, pasted statements) |
+|---|---|---|
+| **Correct** on hidden golden tests | 55 / 55 | 15 / 16 |
+| **Verified → actually correct** (precision) | 53 / 53 | 15 / 16 |
+| First draft correct / rescued by the debugger | 54 / 55 · 1 | 16 / 16 · 0 |
+| Bugs caught only by random stress testing | 0 | 1 |
+| Claimed Big-O matches ground truth | 48 / 48 | 12 / 13 |
+| Coach names the right pattern (strict keyword match) | 50 / 55 | 15 / 16 |
+| Median cost per lesson | 6 calls · 9.3k tokens · 19 s | 7 calls · 10.4k tokens · 17 s |
 
-Metrics the full suite will report:
+Runs that hit rate limits are excluded and reported separately. Problem reconstruction from the name alone ([`evals/name_recognition.py`](backend/evals/name_recognition.py)): 20 / 20.
 
-| Metric | What it measures |
-|---|---|
-| Verified solve rate | Share of problems whose final solution passes examples, oracle tests and random differential tests |
-| First-try pass rate / debug rescue rate | How often the Solver is right immediately, and how often the Debugger recovers |
-| Oracle trust rate | How often the generated brute force reproduces the problem's examples |
-| Complexity agreement | Claimed Big-O vs measured growth |
-| Lesson quality | LLM-judge rubric (pattern correct, hints don't leak the answer, derivation matches code), calibrated on a hand-labeled sample |
-| Cost and latency | Tokens, LLM calls and wall time per lesson; model fallback frequency |
+**What the novel set caught.** The one wrong answer was a false verification. The Test Designer's brute force misread an interval boundary but still passed the statement's only example. The debugger then "fixed" a correct first draft to match it. That led to the Referee (see design decisions). Two fixes since then: examples recalled from a problem's name are treated as correctable, and inputs the harness can't build are dropped rather than blamed on the solution. Both came from a failed Clone Graph recording. The no-debug ablation was cut short by the daily quota (8 runs so far), so it isn't reported yet.
 
 ## Roadmap
 
