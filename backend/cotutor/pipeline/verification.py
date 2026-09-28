@@ -90,6 +90,13 @@ class Verifier:
                     "checker_code": oracle.checker_code, "cases": _for_harness(examples),
                 })
                 failed = [c for c in res.get("cases", []) if c["status"] != "pass"] if res.get("ok") else None
+                # An example whose input can't be built was written down wrong; drop it.
+                broken = {c["id"] for c in failed or [] if c["status"] == "invalid"}
+                if broken:
+                    cases[:] = [c for c in cases if c["id"] not in broken]
+                    examples = [c for c in examples if c["id"] not in broken]
+                    failed = [c for c in failed if c["id"] not in broken]
+                    st.note(f"Dropped {len(broken)} example(s) with malformed input.", "warning")
                 if failed:
                     corrected = await self._correct_invented(spec, solution, examples, failed)
                 oracle.trusted = failed is not None and (not failed or len(corrected) == len(failed))
@@ -129,20 +136,58 @@ class Verifier:
         by_id = {c["id"]: c for c in cases}
         history: list[str] = []
         bugs: list[str] = []
-        verified, trials, passed, attempt = False, 0, 0, 0
-        for attempt in range(self.ctx.config.max_debug_attempts + 1):
+        verified, trials, passed, attempt, refereed, recheck = False, 0, 0, 0, False, False
+        while True:
             verified, failures, passed, trials = await self._verify_once(
-                spec, plan, solution, by_id, oracle, attempt)
+                spec, plan, solution, by_id, oracle, attempt, recheck)
             if verified or attempt == self.ctx.config.max_debug_attempts:
                 break
-            solution = await self._debug_once(spec, solution, failures, by_id, history, bugs, attempt + 1)
+            # The reference is agent-written too. Before "fixing" code to match it, let an
+            # independent referee check the first disagreement against the statement.
+            dispute = self._dispute(failures, by_id) if oracle.trusted and not refereed else None
+            if dispute is not None:
+                refereed = True
+                if await self._referee(spec, dispute, by_id):
+                    oracle.trusted = False
+                    recheck = True
+                    continue  # re-verify the same code without the reference
+            attempt += 1
+            recheck = False
+            solution = await self._debug_once(spec, solution, failures, by_id, history, bugs, attempt)
         return VerificationResult(solution, verified, attempt + 1, passed, len(by_id), trials, bugs)
 
-    async def _verify_once(self, spec, plan, solution, by_id, oracle: Oracle, attempt: int):
+    @staticmethod
+    def _dispute(failures: list[dict], by_id: dict[str, dict]) -> dict | None:
+        """The smallest wrong-answer failure, if every failure is on a reference-graded input."""
+        if not failures or any(by_id.get(f["id"], {}).get("source") not in ("reference", "stress")
+                               or f.get("status") != "fail" or "got" not in f for f in failures):
+            return None
+        return min(failures, key=lambda f: len(json.dumps(by_id[f["id"]]["args"])))
+
+    async def _referee(self, spec: ProblemSpec, failure: dict, by_id: dict[str, dict]) -> bool:
+        """True when the referee sides with the solution against the reference."""
+        args = by_id[failure["id"]]["args"]
+        async with self.ctx.stage("referee", "Referee: settle a disagreement") as st:
+            winner, reasoning, u = await agents.referee(
+                self.ctx.llm, spec, self.ctx.statement, args, failure.get("expected"), failure.get("got"))
+            st.usage(u)
+            if winner == "solution":
+                st.note("Sided with the solution: the reference solution misreads the problem, so "
+                        "it no longer grades tests. " + reasoning[:200], "warning")
+            else:
+                st.note(f"Sided with the {'reference solution' if winner == 'reference' else 'neither'}; "
+                        "debugging the solution. " + reasoning[:200])
+        await self.ctx.artifact("referee", {"case": failure["id"], "winner": winner, "reasoning": reasoning})
+        return winner == "solution"
+
+    async def _verify_once(self, spec, plan, solution, by_id, oracle: Oracle, attempt: int,
+                           recheck: bool = False):
         hspec = harness_spec(spec)
         label = "Verifier: run tests" if attempt == 0 else f"Verifier: re-test fix #{attempt}"
+        if recheck:
+            label = "Verifier: re-test without the reference solution"
         trials, counterexample = 0, None
-        async with self.ctx.stage(f"verify_{attempt}", label) as st:
+        async with self.ctx.stage(f"verify_{attempt}" + ("_recheck" if recheck else ""), label) as st:
             job = {"kind": "tests", "spec": hspec, "code": solution.code,
                    "cases": _for_harness(list(by_id.values()))}
             if oracle.trusted:
@@ -153,6 +198,10 @@ class Verifier:
             if not res.get("ok"):
                 failures = [{"id": "load", "status": "error", "error": res.get("error")}]
             passed = sum(r["status"] in ("pass", "ran") for r in results)
+            invalid = [r["id"] for r in results if r["status"] == "invalid"]
+            for cid in invalid:
+                by_id.pop(cid, None)  # broken tests don't count for or against the solution
+            results_total = len(results) - len(invalid)
 
             if not failures and oracle.trusted and plan.generator_code.strip():
                 diff = await self.ctx.execute({
@@ -173,16 +222,18 @@ class Verifier:
 
             verified = not failures
             if counterexample:
-                note = (f"{passed}/{len(results)} tests pass, but random testing found a "
+                note = (f"{passed}/{results_total} tests pass, but random testing found a "
                         f"failing input after {trials} tries")
             else:
-                note = f"{passed}/{len(results)} tests pass" + (
+                note = f"{passed}/{results_total} tests pass" + (
                     f", {trials} random inputs agree with the reference solution" if trials else "")
                 if failures:
                     note += f" ({len(failures)} failing)"
+            if invalid:
+                note += f"; skipped {len(invalid)} malformed input(s)"
             st.note(note, "done" if verified else "failed")
         await self.ctx.artifact("verification", {
-            "attempt": attempt, "verified": verified, "results": results,
+            "attempt": attempt, "recheck": recheck, "verified": verified, "results": results,
             "cases": list(by_id.values()), "stress_trials": trials,
             "counterexample": counterexample, "load_error": None if res.get("ok") else res.get("error"),
         })

@@ -43,6 +43,7 @@ class RunContext:
     emit: Emit
     config: PipelineConfig = field(default_factory=PipelineConfig)
     stats: RunStats = field(default_factory=RunStats)
+    statement: str = ""  # the learner's original text, when they pasted one
 
     def stage(self, stage_id: str, label: str) -> Stage:
         return Stage(self, stage_id, label)

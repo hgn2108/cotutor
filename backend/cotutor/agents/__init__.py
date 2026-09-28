@@ -9,8 +9,9 @@ instead of "any order is fine", an input generator instead of "it's O(n)".
 from .analyst import analyze
 from .coach import coach_deep, coach_intro
 from .debugger import debug
+from .referee import referee
 from .solver import solve
 from .test_designer import design_tests
 from .tutor import explain
 
-__all__ = ["analyze", "coach_deep", "coach_intro", "debug", "design_tests", "explain", "solve"]
+__all__ = ["analyze", "coach_deep", "coach_intro", "debug", "design_tests", "explain", "referee", "solve"]

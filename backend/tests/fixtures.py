@@ -16,6 +16,7 @@ from cotutor.schemas import (
     PatternOption,
     ProblemSpec,
     ReasoningStep,
+    RefereeVerdict,
     Signal,
     Solution,
     TestCaseDraft,
@@ -174,7 +175,11 @@ LESSON_DEEP = LessonDeep(
 )
 
 
+# The self-pairing bug is real, so the referee does not side with the solution.
+REFEREE = RefereeVerdict(reasoning="Neither candidate is the only valid pair here.", correct="neither")
+
+
 def two_sum_script():
     return {"analyst": [SPEC], "test_designer": [PLAN], "solver": [SOLUTION],
             "debugger": [DEBUG], "tutor": [EXPLANATION], "coach_intro": [LESSON_INTRO],
-            "coach_deep": [LESSON_DEEP]}
+            "coach_deep": [LESSON_DEEP], "referee": [REFEREE]}

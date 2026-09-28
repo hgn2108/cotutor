@@ -104,6 +104,11 @@ class Solution(BaseModel):
     space_complexity: str
 
 
+class RefereeVerdict(BaseModel):
+    reasoning: str = Field(description="Step-by-step trace of the input, derived from the statement.")
+    correct: Literal["A", "B", "neither"]
+
+
 class DebugResult(BaseModel):
     diagnosis: str = Field(description="Root cause in 1-3 sentences.")
     blame: Literal["solution", "test"] = Field(

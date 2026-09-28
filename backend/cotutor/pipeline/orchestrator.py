@@ -91,6 +91,12 @@ class Pipeline:
         # Signal phrases must quote text the learner sees: the original statement, or for a
         # problem given by name, the Analyst's own restatement.
         statement = spec.summary if known else problem
+        self.ctx.statement = "" if known else problem
+        if known:
+            # No statement was given, so its examples are recalled from memory and can be wrong
+            # (or wrapped wrongly): let the oracle and solution correct them by consensus.
+            spec = spec.model_copy(update={"examples": [
+                e.model_copy(update={"from_statement": False}) for e in spec.examples]})
 
         # Test design and solving are independent, so the two agents work in parallel.
         plan, solution = await asyncio.gather(self._design_tests(spec), self._solve(spec))

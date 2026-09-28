@@ -484,6 +484,17 @@ def job_tests(job, emit):
     results = []
     for case in job["cases"]:
         emit({"ev": "case_start", "id": case["id"]})
+        try:
+            run.prepare(case["args"])
+        except Exception as exc:
+            # An input that can't even be built (wrong nesting, bad node refs) is a broken test,
+            # not a bug in the solution.
+            message = f"{type(exc).__name__}: {exc}"[:300]
+            res = {"id": case["id"], "status": "invalid", "expected_source": "none",
+                   "error": {"type": "InvalidInput", "message": message, "where": []}}
+            results.append(res)
+            emit({"ev": "case_result", "result": res})
+            continue
         # A case "has" an expected value only if the key is present (None can be a real answer).
         expected, expected_source = case.get("expected"), "given"
         if "expected" not in case:

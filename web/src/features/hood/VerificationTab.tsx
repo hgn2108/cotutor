@@ -7,7 +7,7 @@ import { Badge, Card, formatJson, Mono, SectionTitle, Waiting } from '../../comp
 import { ArgsInline } from '../lesson/parts'
 import type { ProblemSpec } from '../../lib/types'
 
-const statusTone = { pass: 'ok', ran: 'neutral', fail: 'bad', error: 'bad', timeout: 'warn', skipped: 'neutral' } as const
+const statusTone = { pass: 'ok', ran: 'neutral', fail: 'bad', error: 'bad', timeout: 'warn', skipped: 'neutral', invalid: 'neutral' } as const
 const sourceLabel: Record<CaseDef['source'], [string, 'accent' | 'neutral' | 'warn']> = {
   example: ['example', 'accent'],
   reference: ['generated', 'neutral'],
@@ -41,7 +41,7 @@ export function VerificationTab({ state }: { state: RunState }) {
             <div className="flex rounded-lg bg-sunken p-0.5 text-xs">
               {verifications.map((x, i) => (
                 <button key={i} onClick={() => setAttemptIdx(i)} className={clsx('rounded-md px-2.5 py-1', (attemptIdx ?? verifications.length - 1) === i ? 'bg-panel shadow-sm' : 'text-muted')}>
-                  {i === 0 ? 'First run' : `After fix #${i}`} {x.verified ? '✓' : '✗'}
+                  {i === 0 ? 'First run' : x.recheck ? 'Re-checked' : `After fix #${x.attempt}`} {x.verified ? '✓' : '✗'}
                 </button>
               ))}
             </div>
@@ -116,7 +116,7 @@ function Row({ r, c, spec }: { r: CaseResult; c?: CaseDef; spec?: ProblemSpec })
           : <Mono className={r.status === 'fail' ? 'text-bad' : ''}>{formatJson(r.got)}</Mono>}
       </td>
       <td className="px-4 py-2.5 text-right">
-        <Badge tone={statusTone[r.status]} title={r.status === 'ran' ? 'No known answer for this input; the solution just had to run without errors.' : undefined}>{r.status}</Badge>
+        <Badge tone={statusTone[r.status]} title={r.status === 'ran' ? 'No known answer for this input; the solution just had to run without errors.' : r.status === 'invalid' ? 'This input was malformed, so it was skipped.' : undefined}>{r.status}</Badge>
         {r.ms !== undefined && <div className="mt-1 font-mono text-[10.5px] text-faint">{r.ms.toFixed(2)}ms</div>}
       </td>
     </tr>

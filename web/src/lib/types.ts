@@ -51,7 +51,7 @@ export interface CaseDef {
 
 export interface CaseResult {
   id: string
-  status: 'pass' | 'fail' | 'error' | 'timeout' | 'ran' | 'skipped'
+  status: 'pass' | 'fail' | 'error' | 'timeout' | 'ran' | 'skipped' | 'invalid'
   expected?: Json
   expected_source?: string
   got?: Json
@@ -61,6 +61,8 @@ export interface CaseResult {
 }
 
 export interface Verification {
+  /** Re-run after the referee sided with the solution, without the reference solution. */
+  recheck?: boolean
   attempt: number
   verified: boolean
   results: CaseResult[]

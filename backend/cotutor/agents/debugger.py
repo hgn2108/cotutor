@@ -16,9 +16,11 @@ async def debug(
         "You are the Debugger. A solution failed verification. Find the root cause from the "
         "concrete failing cases and return a corrected full solution. Change only what is "
         "needed. Expected outputs from the problem's own examples are authoritative; "
-        "expected outputs marked 'reference' come from a brute-force oracle and are almost "
-        "always right. Only set blame='test' if you can prove the expected value violates "
-        "the problem statement. " + PYTHON_ENV_NOTE
+        "expected outputs marked 'reference' come from a brute-force reference written by "
+        "another agent: usually right, but it can misread the statement too. Before changing "
+        "code, work out the correct output for the failing input from the statement yourself. "
+        "Set blame='test' if you can show the expected value violates the problem statement. "
+        + PYTHON_ENV_NOTE
     )
     prompt = (
         f"{spec_block(spec)}\n\nCurrent code:\n```python\n{solution.code}\n```\n\n"

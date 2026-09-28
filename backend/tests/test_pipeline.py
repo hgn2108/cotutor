@@ -1,6 +1,6 @@
 from cotutor.executor import LocalExecutor
-from cotutor.llm import ScriptedLLM
-from cotutor.pipeline import Pipeline, PipelineConfig
+from cotutor.llm import ScriptedLLM, Usage
+from cotutor.pipeline import Pipeline, PipelineConfig, verification
 
 from .fixtures import FIXED_CODE, two_sum_script
 
@@ -205,3 +205,32 @@ async def test_wrong_statement_example_is_not_overridden():
     _, events, _ = await run_pipeline(_with_example("[0,2]", from_statement=True))
     oracle = artifacts(events, "oracle")[0]
     assert oracle["trusted"] is False and oracle["corrected_examples"] == []
+
+
+async def test_referee_stops_the_debugger_from_matching_a_wrong_reference(monkeypatch):
+    """A reference that passes the examples but misreads the problem must not rewrite correct code."""
+    script = two_sum_script()
+    script["solver"][0] = script["solver"][0].model_copy(update={"code": FIXED_CODE})
+    wrong_ref = script["test_designer"][0].model_copy(update={"checker_code": "", "reference_solution": (
+        "def twoSum(nums, target):\n"
+        "    if target <= 0:\n"
+        "        return []  # misreads the problem: thinks non-positive targets have no answer\n"
+        "    for i in range(len(nums)):\n"
+        "        for j in range(i + 1, len(nums)):\n"
+        "            if nums[i] + nums[j] == target:\n"
+        "                return [i, j]\n")})
+    script["test_designer"] = [wrong_ref, wrong_ref]
+    script["debugger"] = []  # must not be called
+    seen = []
+
+    async def fake_referee(llm, spec, statement, args, reference_out, solution_out):
+        seen.append((args, reference_out, solution_out))
+        return "solution", "Target 0 is reachable: -3 + 3 = 0.", Usage(model="test")
+
+    monkeypatch.setattr(verification.agents, "referee", fake_referee)
+    summary, events, _ = await run_pipeline(script)
+
+    assert seen and seen[0][1] == []
+    assert summary["verified"] is True
+    assert artifacts(events, "solution")[-1]["code"] == FIXED_CODE
+    assert artifacts(events, "verification")[-1]["recheck"] is True

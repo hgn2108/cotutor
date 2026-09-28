@@ -228,6 +228,15 @@ def test_clone_graph_requires_a_real_deep_copy():
     assert "deep copy" in str(cheat["cases"][0]["got"])
 
 
+
+def test_malformed_inputs_are_invalid_tests_not_solution_bugs():
+    spec = spec_of("cloneGraph", [("node", "Optional[GraphNode]")], "Optional[GraphNode]")
+    cases = [{"id": "single", "args": [[[]]], "expected": [[]]},
+             {"id": "overnested", "args": [[[[2, 3], [1], [1]]]]}]
+    res = run({"kind": "tests", "spec": spec, "code": CLONE, "cases": cases})
+    assert [c["status"] for c in res["cases"]] == ["pass", "invalid"]
+
+
 def test_copy_random_list_round_trips_pointers():
     spec = spec_of("copyRandomList", [("head", "Optional[RandomNode]")], "Optional[RandomNode]")
     code = """
